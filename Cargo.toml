@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "crates/types",
+    "crates/mesh",
+    "crates/fields",
+    "crates/discretization",
+    "crates/solvers",
+    "crates/models",
+    "crates/runtime",
+    "crates/io",
+    "apps/simple-solver",
+]
+resolver = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Dugong Contributors"]
+license = "MIT OR Apache-2.0"

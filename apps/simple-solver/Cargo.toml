@@ -1,0 +1,20 @@
+[package]
+name = "simple-solver"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "simple-solver"
+path = "src/main.rs"
+
+[dependencies]
+dugong-types = { path = "../../crates/types" }
+dugong-mesh = { path = "../../crates/mesh" }
+dugong-fields = { path = "../../crates/fields" }
+dugong-discretization = { path = "../../crates/discretization" }
+dugong-solvers = { path = "../../crates/solvers" }
+dugong-models = { path = "../../crates/models" }
+dugong-runtime = { path = "../../crates/runtime" }
+dugong-io = { path = "../../crates/io" }

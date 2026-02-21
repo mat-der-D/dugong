@@ -1,0 +1,10 @@
+[package]
+name = "dugong-solvers"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+dugong-types = { path = "../types" }
+dugong-discretization = { path = "../discretization" }

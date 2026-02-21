@@ -1,0 +1,13 @@
+[package]
+name = "dugong-models"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+dugong-types = { path = "../types" }
+dugong-mesh = { path = "../mesh" }
+dugong-fields = { path = "../fields" }
+dugong-discretization = { path = "../discretization" }
+dugong-runtime = { path = "../runtime" }

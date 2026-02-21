@@ -1,0 +1,13 @@
+[package]
+name = "dugong-io"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+dugong-types = { path = "../types" }
+dugong-mesh = { path = "../mesh" }
+dugong-fields = { path = "../fields" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

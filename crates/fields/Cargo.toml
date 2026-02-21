@@ -1,0 +1,12 @@
+[package]
+name = "dugong-fields"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+dugong-types = { path = "../types" }
+dugong-mesh = { path = "../mesh" }
+
+[dev-dependencies]
