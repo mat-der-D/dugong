@@ -5,10 +5,13 @@ use super::types::{SphericalTensor, SymmTensor, Tensor, Vector};
 
 // ===== 異型間加算・減算 =====
 
-// SymmTensor + SphericalTensor → SymmTensor
 impl Add<SphericalTensor> for SymmTensor {
     type Output = SymmTensor;
 
+    /// `SymmTensor + SphericalTensor → SymmTensor`。
+    ///
+    /// `SphericalTensor(s)` を対角成分に展開して加算する:
+    /// `result = [xx+s, xy, xz, yy+s, yz, zz+s]`
     #[inline]
     fn add(self, rhs: SphericalTensor) -> SymmTensor {
         let s = rhs.value();
@@ -23,20 +26,23 @@ impl Add<SphericalTensor> for SymmTensor {
     }
 }
 
-// SphericalTensor + SymmTensor → SymmTensor
 impl Add<SymmTensor> for SphericalTensor {
     type Output = SymmTensor;
 
+    /// `SphericalTensor + SymmTensor → SymmTensor`。加算は可換なので `rhs + self` に委譲する。
     #[inline]
     fn add(self, rhs: SymmTensor) -> SymmTensor {
         rhs + self
     }
 }
 
-// SymmTensor - SphericalTensor → SymmTensor
 impl Sub<SphericalTensor> for SymmTensor {
     type Output = SymmTensor;
 
+    /// `SymmTensor - SphericalTensor → SymmTensor`。
+    ///
+    /// `SphericalTensor(s)` を対角成分から減算する:
+    /// `result = [xx-s, xy, xz, yy-s, yz, zz-s]`
     #[inline]
     fn sub(self, rhs: SphericalTensor) -> SymmTensor {
         let s = rhs.value();
@@ -51,10 +57,13 @@ impl Sub<SphericalTensor> for SymmTensor {
     }
 }
 
-// SphericalTensor - SymmTensor → SymmTensor
 impl Sub<SymmTensor> for SphericalTensor {
     type Output = SymmTensor;
 
+    /// `SphericalTensor(s) - SymmTensor → SymmTensor`。
+    ///
+    /// `SphericalTensor(s)` を対角成分として展開し、`SymmTensor` を減算する:
+    /// `result = [s-xx, -xy, -xz, s-yy, -yz, s-zz]`
     #[inline]
     fn sub(self, rhs: SymmTensor) -> SymmTensor {
         let s = self.value();
@@ -69,10 +78,12 @@ impl Sub<SymmTensor> for SphericalTensor {
     }
 }
 
-// Tensor + SymmTensor → Tensor
 impl Add<SymmTensor> for Tensor {
     type Output = Tensor;
 
+    /// `Tensor + SymmTensor → Tensor`。
+    ///
+    /// `SymmTensor` を対称性（`yx=xy`, `zx=xz`, `zy=yz`）を利用して 9 成分に展開して加算する。
     #[inline]
     fn add(self, rhs: SymmTensor) -> Tensor {
         Tensor::new(
@@ -89,10 +100,12 @@ impl Add<SymmTensor> for Tensor {
     }
 }
 
-// Tensor - SymmTensor → Tensor
 impl Sub<SymmTensor> for Tensor {
     type Output = Tensor;
 
+    /// `Tensor - SymmTensor → Tensor`。
+    ///
+    /// `SymmTensor` を対称性（`yx=xy`, `zx=xz`, `zy=yz`）を利用して 9 成分に展開して減算する。
     #[inline]
     fn sub(self, rhs: SymmTensor) -> Tensor {
         Tensor::new(
@@ -109,10 +122,13 @@ impl Sub<SymmTensor> for Tensor {
     }
 }
 
-// Tensor + SphericalTensor → Tensor
 impl Add<SphericalTensor> for Tensor {
     type Output = Tensor;
 
+    /// `Tensor + SphericalTensor → Tensor`。
+    ///
+    /// `SphericalTensor(s)` を対角成分に展開して加算する:
+    /// `result = [xx+s, xy, xz, yx, yy+s, yz, zx, zy, zz+s]`
     #[inline]
     fn add(self, rhs: SphericalTensor) -> Tensor {
         let s = rhs.value();
@@ -130,10 +146,13 @@ impl Add<SphericalTensor> for Tensor {
     }
 }
 
-// Tensor - SphericalTensor → Tensor
 impl Sub<SphericalTensor> for Tensor {
     type Output = Tensor;
 
+    /// `Tensor - SphericalTensor → Tensor`。
+    ///
+    /// `SphericalTensor(s)` を対角成分から減算する:
+    /// `result = [xx-s, xy, xz, yx, yy-s, yz, zx, zy, zz-s]`
     #[inline]
     fn sub(self, rhs: SphericalTensor) -> Tensor {
         let s = rhs.value();
@@ -153,20 +172,29 @@ impl Sub<SphericalTensor> for Tensor {
 
 // ===== 単縮約（Mul trait: rank(A) + rank(B) - 2）=====
 
-// Vector * Vector → f64（内積）
 impl Mul<Vector> for Vector {
     type Output = f64;
 
+    /// 内積（単縮約）: `a · b = ax*bx + ay*by + az*bz`。
+    ///
+    /// rank(1) + rank(1) - 2 = 0 → スカラーを返す。
     #[inline]
     fn mul(self, rhs: Vector) -> f64 {
         self.x() * rhs.x() + self.y() * rhs.y() + self.z() * rhs.z()
     }
 }
 
-// Tensor * Vector → Vector（行列・ベクトル積）
 impl Mul<Vector> for Tensor {
     type Output = Vector;
 
+    /// 行列・ベクトル積（単縮約）: `T * v`。
+    ///
+    /// `r_i = Σ_j T_ij * v_j`（rank(2) + rank(1) - 2 = 1 → ベクトルを返す）:
+    /// ```text
+    /// rx = xx*vx + xy*vy + xz*vz
+    /// ry = yx*vx + yy*vy + yz*vz
+    /// rz = zx*vx + zy*vy + zz*vz
+    /// ```
     #[inline]
     fn mul(self, v: Vector) -> Vector {
         Vector::new(
@@ -177,10 +205,18 @@ impl Mul<Vector> for Tensor {
     }
 }
 
-// Vector * Tensor → Vector（ベクトル・行列積: v^T * T）
 impl Mul<Tensor> for Vector {
     type Output = Vector;
 
+    /// ベクトル・行列積（単縮約）: `v^T * T`。
+    ///
+    /// `r_j = Σ_i v_i * T_ij`（rank(1) + rank(2) - 2 = 1 → ベクトルを返す）:
+    /// ```text
+    /// rx = vx*xx + vy*yx + vz*zx
+    /// ry = vx*xy + vy*yy + vz*zy
+    /// rz = vx*xz + vy*yz + vz*zz
+    /// ```
+    /// `Tensor * Vector` とは転置の関係にあり、一般に結果が異なる。
     #[inline]
     fn mul(self, t: Tensor) -> Vector {
         Vector::new(
@@ -191,10 +227,12 @@ impl Mul<Tensor> for Vector {
     }
 }
 
-// Tensor * Tensor → Tensor（行列積）
 impl Mul<Tensor> for Tensor {
     type Output = Tensor;
 
+    /// 行列積（単縮約）: `A * B`。
+    ///
+    /// `R_ij = Σ_k A_ik * B_kj`（rank(2) + rank(2) - 2 = 2 → テンソルを返す）。
     #[inline]
     fn mul(self, b: Tensor) -> Tensor {
         Tensor::new(
@@ -211,10 +249,18 @@ impl Mul<Tensor> for Tensor {
     }
 }
 
-// SymmTensor * Vector → Vector
 impl Mul<Vector> for SymmTensor {
     type Output = Vector;
 
+    /// 対称行列・ベクトル積（単縮約）: `S * v`。
+    ///
+    /// 対称性（`yx=xy`, `zx=xz`, `zy=yz`）を利用して 6 成分から直接計算する
+    /// （rank(2) + rank(1) - 2 = 1 → ベクトルを返す）:
+    /// ```text
+    /// rx = xx*vx + xy*vy + xz*vz
+    /// ry = xy*vx + yy*vy + yz*vz
+    /// rz = xz*vx + yz*vy + zz*vz
+    /// ```
     #[inline]
     fn mul(self, v: Vector) -> Vector {
         Vector::new(
@@ -225,10 +271,13 @@ impl Mul<Vector> for SymmTensor {
     }
 }
 
-// SymmTensor * SymmTensor → Tensor（行列積、結果は一般に非対称）
 impl Mul<SymmTensor> for SymmTensor {
     type Output = Tensor;
 
+    /// 行列積（単縮約）: `A * B`。
+    ///
+    /// `R_ij = Σ_k A_ik * B_kj`（rank(2) + rank(2) - 2 = 2）。
+    /// 対称テンソル同士の積は一般に非対称になるため `Tensor` を返す。
     #[inline]
     fn mul(self, b: SymmTensor) -> Tensor {
         Tensor::new(

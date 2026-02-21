@@ -40,6 +40,7 @@ impl Neg for Vector {
 impl Mul<f64> for Vector {
     type Output = Self;
 
+    /// スカラー倍（右）: `v * s`。全成分に `s` を乗じる。
     #[inline]
     fn mul(self, s: f64) -> Self {
         let a = self.as_array();
@@ -50,6 +51,7 @@ impl Mul<f64> for Vector {
 impl Mul<Vector> for f64 {
     type Output = Vector;
 
+    /// スカラー倍（左）: `s * v`。`v * s` に委譲する。
     #[inline]
     fn mul(self, v: Vector) -> Vector {
         v * self
@@ -153,6 +155,7 @@ impl Neg for Tensor {
 impl Mul<f64> for Tensor {
     type Output = Self;
 
+    /// スカラー倍（右）: `T * s`。全 9 成分に `s` を乗じる。
     #[inline]
     fn mul(self, s: f64) -> Self {
         let a = self.as_array();
@@ -173,6 +176,7 @@ impl Mul<f64> for Tensor {
 impl Mul<Tensor> for f64 {
     type Output = Tensor;
 
+    /// スカラー倍（左）: `s * T`。`T * s` に委譲する。
     #[inline]
     fn mul(self, t: Tensor) -> Tensor {
         t * self
@@ -278,6 +282,7 @@ impl Neg for SymmTensor {
 impl Mul<f64> for SymmTensor {
     type Output = Self;
 
+    /// スカラー倍（右）: `S * s`。6 独立成分すべてに `s` を乗じる。
     #[inline]
     fn mul(self, s: f64) -> Self {
         let a = self.as_array();
@@ -288,6 +293,7 @@ impl Mul<f64> for SymmTensor {
 impl Mul<SymmTensor> for f64 {
     type Output = SymmTensor;
 
+    /// スカラー倍（左）: `s * S`。`S * s` に委譲する。
     #[inline]
     fn mul(self, t: SymmTensor) -> SymmTensor {
         t * self
@@ -364,6 +370,7 @@ impl Neg for SphericalTensor {
 impl Mul<f64> for SphericalTensor {
     type Output = Self;
 
+    /// スカラー倍（右）: `sph * s`。内部スカラー値に `s` を乗じる。
     #[inline]
     fn mul(self, s: f64) -> Self {
         SphericalTensor::new(self.value() * s)
@@ -373,6 +380,7 @@ impl Mul<f64> for SphericalTensor {
 impl Mul<SphericalTensor> for f64 {
     type Output = SphericalTensor;
 
+    /// スカラー倍（左）: `s * sph`。`sph * s` に委譲する。
     #[inline]
     fn mul(self, t: SphericalTensor) -> SphericalTensor {
         t * self
