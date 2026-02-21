@@ -4,8 +4,8 @@
 
 Spec 1-3 `types-dimension`: コンパイル時次元検査システム
 
-`crates/types` に `Dim<V, const M: i8, const L: i8, const T: i8>` 構造体を実装し、
-const generics によって物理次元の整合性をコンパイル時に保証する。
+`crates/types` に `Dim<V, M: Integer, L: Integer, T: Integer>` 構造体を実装し、
+`typenum` 型レベル整数によって物理次元の整合性をコンパイル時に保証する（stable Rust）。
 前段の Spec 1-1（テンソル型）・Spec 1-2（`FieldValue` trait）が完了済みであることを前提とする。
 
 ---
@@ -18,7 +18,7 @@ const generics によって物理次元の整合性をコンパイル時に保�
 
 #### 受け入れ基準
 
-1. The `Dim`型 shall `struct Dim<V, const M: i8, const L: i8, const T: i8>` として定義され、内部値を `value: V` フィールドで保持すること。
+1. The `Dim`型 shall `struct Dim<V, M: Integer, L: Integer, T: Integer>` として定義され、内部値を `value: V` フィールドと `_phantom: PhantomData<(M, L, T)>` を保持すること。
 2. The `Dim`型 shall `new(value: V) -> Self` コンストラクタを提供し、値を包んで次元付き量を生成できること。
 3. The `Dim`型 shall `value(&self) -> V`（または `V: Copy` のとき）メソッドを提供し、内部の生の値を取り出せること。
 4. The `Dim`型 shall `#[derive(Debug, Clone, Copy, PartialEq)]` を付与し、標準的な Rust トレイトを実装すること（ただし `V` が各トレイトを満たす場合）。
@@ -33,7 +33,7 @@ const generics によって物理次元の整合性をコンパイル時に保�
 #### 受け入れ基準
 
 1. The `Quantity`型 shall `trait Quantity` として定義され、`type Value` の associated type を持つこと。
-2. The `Quantity`型 shall `impl<V, const M: i8, const L: i8, const T: i8> Quantity for Dim<V, M, L, T>` として実装され、`type Value = V` となること。
+2. The `Quantity`型 shall `impl<V, M: Integer, L: Integer, T: Integer> Quantity for Dim<V, M, L, T>` として実装され、`type Value = V` となること。
 3. The `types`クレート shall `Quantity` トレイトを `crates/types/src/dimension/` に配置し、`lib.rs` から公開すること。
 4. When `Quantity` トレイトを使用するとき、the `types`クレート shall `Quantity::Value: FieldValue` という bound で次元システムとテンソル型システムを接合できること。
 
@@ -58,10 +58,10 @@ const generics によって物理次元の整合性をコンパイル時に保�
 
 #### 受け入れ基準
 
-1. When `Dim<V1, M1, L1, T1>` と `Dim<V2, M2, L2, T2>` を乗算するとき、the `Dim`型 shall `Dim<..., {M1+M2}, {L1+L2}, {T1+T2}>` を返すこと（const generics の算術による次元指数の加算）。
-2. When `Dim<V1, M1, L1, T1>` を `Dim<V2, M2, L2, T2>` で除算するとき、the `Dim`型 shall `Dim<..., {M1-M2}, {L1-L2}, {T1-T2}>` を返すこと（次元指数の減算）。
+1. When `Dim<V1, M1, L1, T1>` と `Dim<V2, M2, L2, T2>` を乗算するとき、the `Dim`型 shall `Dim<..., Sum<M1,M2>, Sum<L1,L2>, Sum<T1,T2>>` を返すこと（`typenum::Sum` による次元指数の加算）。
+2. When `Dim<V1, M1, L1, T1>` を `Dim<V2, M2, L2, T2>` で除算するとき、the `Dim`型 shall `Dim<..., Diff<M1,M2>, Diff<L1,L2>, Diff<T1,T2>>` を返すこと（`typenum::Diff` による次元指数の減算）。
 3. The `Dim`型 shall `Dim<f64, M, L, T>` の `f64` 乗算・除算において、内部値の乗除算結果と次元指数の算術が一致して計算されること。
-4. When `Dim<V, M, L, T>` を無次元スカラー `f64`（= `Dim<f64, 0, 0, 0>` に相当）で乗算するとき、the `Dim`型 shall 結果次元が元と同じ `Dim<..., M, L, T>` になること。
+4. When `Dim<V, M, L, T>` を無次元スカラー `f64`（= `Dim<f64, Z0, Z0, Z0>` に相当）で乗算するとき、the `Dim`型 shall 結果次元が元と同じ `Dim<..., M, L, T>` になること。
 
 ---
 
@@ -79,20 +79,20 @@ const generics によって物理次元の整合性をコンパイル時に保�
 
 ### 要件 6: CFD 標準物理量の型エイリアス
 
-**目的**: CFD フレームワークの開発者として、頻繁に使用する物理量に対して意味のある型エイリアスを使えることを望む。これによりコードが `Dim<f64, 1, -1, -2>` ではなく `Pressure` として読めるようになる。
+**目的**: CFD フレームワークの開発者として、頻繁に使用する物理量に対して意味のある型エイリアスを使えることを望む。これによりコードが `Dim<f64, P1, N1, N2>` ではなく `Pressure` として読めるようになる。
 
 #### 受け入れ基準
 
 1. The `types`クレート shall 以下の型エイリアスを `crates/types/src/dimension/` に定義し公開すること:
-   - `type Pressure = Dim<f64, 1, -1, -2>` （Pa = kg·m⁻¹·s⁻²）
-   - `type Velocity = Dim<Vector, 0, 1, -1>` （m·s⁻¹）
-   - `type Density = Dim<f64, 1, -3, 0>` （kg·m⁻³）
+   - `type Pressure = Dim<f64, P1, N1, N2>` （Pa = kg·m⁻¹·s⁻²）
+   - `type Velocity = Dim<Vector, Z0, P1, N1>` （m·s⁻¹）
+   - `type Density = Dim<f64, P1, N3, Z0>` （kg·m⁻³）
 2. The `types`クレート shall 追加として以下の型エイリアスも定義すること:
-   - `type DynamicViscosity = Dim<f64, 1, -1, -1>` （Pa·s = kg·m⁻¹·s⁻¹）
-   - `type KinematicViscosity = Dim<f64, 0, 2, -1>` （m²·s⁻¹）
-   - `type Length = Dim<f64, 0, 1, 0>` （m）
-   - `type Time = Dim<f64, 0, 0, 1>` （s）
-   - `type Mass = Dim<f64, 1, 0, 0>` （kg）
+   - `type DynamicViscosity = Dim<f64, P1, N1, N1>` （Pa·s = kg·m⁻¹·s⁻¹）
+   - `type KinematicViscosity = Dim<f64, Z0, P2, N1>` （m²·s⁻¹）
+   - `type Length = Dim<f64, Z0, P1, Z0>` （m）
+   - `type Time = Dim<f64, Z0, Z0, P1>` （s）
+   - `type Mass = Dim<f64, P1, Z0, Z0>` （kg）
 3. The 型エイリアス shall `use dugong_types::{Pressure, Velocity, Density};` で直接インポートして使用できること。
 
 ---

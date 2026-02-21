@@ -105,7 +105,7 @@ trait HasDiv: FieldValue {
 `type Value = V` を公開する。ここで両システムが接合する：
 
 ```
-Dim<Vector, 0, 1, -1>  implements  Quantity { type Value = Vector }
+Dim<Vector, Z0, P1, N1>  implements  Quantity { type Value = Vector }
                                                         ↓
                                               Vector implements FieldValue
 ```

@@ -22,7 +22,7 @@
 ## 開発標準
 
 ### 型安全性
-- const generics による次元検査（`Dim<V, M, L, T>`）
+- `typenum` 型レベル整数による次元検査（`Dim<V, M, L, T>`）
 - typestate パターンによる状態遷移の型レベル保証（`Fresh`/`Stale`）
 - trait bounds で演算の合法性をコンパイル時検証
 

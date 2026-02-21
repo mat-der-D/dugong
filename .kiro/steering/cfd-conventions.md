@@ -10,7 +10,7 @@
 ### 継承しない設計
 - **dlopen によるプラグイン**: 静的リンク＋`inventory` による実行時選択に置換
 - **objectRegistry（文字列ベースのフィールド検索）**: 型付き依存性注入に置換
-- **`dimensionSet` の実行時検査**: const generics によるコンパイル時検査に置換
+- **`dimensionSet` の実行時検査**: typenum 型レベル整数によるコンパイル時検査に置換
 - **仮想関数による境界条件の完全統一**: enum による内部分離＋フィールドレベルの統一
 
 ## 命名規約（CFD ドメイン固有）
@@ -53,9 +53,11 @@ fvc.curl(field)          // 回転
 
 ```rust
 // SI 基本次元: M (質量), L (長さ), T (時間)
-type Pressure  = Dim<f64,      1, -1, -2>;  // kg/(m·s²) = Pa
-type Velocity  = Dim<Vector,   0,  1, -1>;  // m/s
-type Density   = Dim<f64,      1, -3,  0>;  // kg/m³
+// typenum: P1=+1, P2=+2, P3=+3, N1=-1, N2=-2, N3=-3, Z0=0
+use typenum::{P1, P2, P3, N1, N2, N3, Z0};
+type Pressure  = Dim<f64,      P1, N1, N2>;  // kg/(m·s²) = Pa
+type Velocity  = Dim<Vector,   Z0, P1, N1>;  // m/s
+type Density   = Dim<f64,      P1, N3, Z0>;  // kg/m³
 ```
 
 - 型エイリアスを `types` クレートに集約
