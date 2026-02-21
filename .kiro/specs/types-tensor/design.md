@@ -85,6 +85,8 @@ graph TB
 | 3.6–3.9 | 縮約演算 | cross_ops.rs | `Mul` の異型 impl | — |
 | 3.10–3.11 | 二重縮約 | cross_ops.rs | `fn double_dot(...)` | — |
 | 3.12 | 外積 | cross_ops.rs | `fn outer(...)` | — |
+| 3.13 | ベクトル内積 | cross_ops.rs | `fn dot(...)` | — |
+| 3.14 | ベクトルクロス積 | cross_ops.rs | `fn cross(...)` | — |
 | 4.1–4.15 | 型変換メソッド | convert.rs | `fn symm()` 等のメソッド | — |
 | 5.1–5.3 | From 変換 | convert.rs | `impl From<...>` | — |
 | 6.1–6.7 | 特殊値コンストラクタ | special.rs | `fn zero()`, `fn identity()` | — |
@@ -252,7 +254,7 @@ impl DivAssign<f64> for T {}
 | Field | Detail |
 |-------|--------|
 | Intent | 異なるテンソルランク間の物理的に意味のある演算の提供 |
-| Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12 |
+| Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 |
 
 **Responsibilities & Constraints**
 - 異型間加算・減算（ランク昇格規則に従う）
@@ -316,6 +318,12 @@ impl SymmTensor {
 impl Vector {
     /// 外積: a ⊗ b → Tensor（T_ij = a_i * b_j）
     pub fn outer(&self, other: &Vector) -> Tensor;
+
+    /// 内積: a · b → f64（a_x*b_x + a_y*b_y + a_z*b_z）
+    pub fn dot(&self, other: &Vector) -> f64;
+
+    /// クロス積: a × b → Vector
+    pub fn cross(&self, other: &Vector) -> Vector;
 }
 ```
 
@@ -324,12 +332,17 @@ impl Vector {
 - Invariants:
   - `(T * v).mag() <= T.mag() * v.mag()`（ノルムの副乗法性）
   - `T.double_dot(&Tensor::identity()) == T.trace()`
+  - `a.dot(&b) == b.dot(&a)`（内積の可換性）
+  - `a.cross(&b) == -(b.cross(&a))`（クロス積の反可換性）
+  - `a.dot(&a.cross(&b)) == 0.0`（クロス積は両入力に直交）
 
 **Implementation Notes**
 - 異型間加算では、低ランク型を暗黙的に高ランク型に展開してから加算する（例: `SphericalTensor` → 対角 `SymmTensor`）
 - `Vector * Tensor` は `v^T * T` として計算（結果はベクトル）
 - `SymmTensor * Vector` は `SymmTensor` を完全テンソルに展開してから乗算する内部実装だが、6 成分から直接計算して効率化する
 - 二重縮約の定義: `A:B = Σ_ij A_ij * B_ij`（Frobenius 内積）
+- `dot()` は OpenFOAM の `operator&(Vector, Vector)` に相当。Rust では `&` 演算子のオーバーロードが不可のため名前付きメソッドとする
+- `cross()` は OpenFOAM の `operator^(Vector, Vector)` に相当。同様に名前付きメソッドとする
 
 ---
 
@@ -562,6 +575,8 @@ graph LR
 - `test_tensor_tensor_contraction`: 行列積の手計算検証
 - `test_double_dot_with_identity`: `T:I == trace(T)` の検証
 - `test_outer_product`: 外積の手計算検証
+- `test_dot_product`: 内積の手計算検証と可換性
+- `test_cross_product`: クロス積の手計算検証と反可換性・直交性
 
 ### Unit Tests（convert.rs）
 - `test_symm_plus_skew_equals_original`: `symm() + skew() == T` の分解検証

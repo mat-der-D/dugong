@@ -46,7 +46,7 @@ CFD（数値流体力学）フレームワークの基盤となるテンソル�
 
 ### Requirement 3: 異型間演算
 
-**Objective:** As a フレームワーク開発者, I want テンソルランクが異なる型同士の物理的に意味のある演算（加算・縮約・二重縮約）を型安全に行いたい, so that 不正なテンソル演算がコンパイル時に排除される。
+**Objective:** As a フレームワーク開発者, I want テンソルランクが異なる型同士の物理的に意味のある演算（加算・縮約・二重縮約・内積・クロス積）を型安全に行いたい, so that 不正なテンソル演算がコンパイル時に排除される。
 
 #### Acceptance Criteria
 
@@ -62,6 +62,8 @@ CFD（数値流体力学）フレームワークの基盤となるテンソル�
 10. The tensor module shall テンソルの二重縮約 `Tensor : Tensor` → `f64` を名前付きメソッド（`double_dot` 等）で提供する。
 11. The tensor module shall `SymmTensor : SymmTensor` → `f64` の二重縮約を提供する。
 12. The tensor module shall 外積 `Vector ⊗ Vector` → `Tensor` を名前付きメソッド（`outer` 等）で提供する。
+13. The tensor module shall ベクトル内積 `Vector · Vector` → `f64` を名前付きメソッド（`dot` 等）で提供する。
+14. The tensor module shall ベクトルクロス積 `Vector × Vector` → `Vector` を名前付きメソッド（`cross` 等）で提供する。
 
 ---
 
