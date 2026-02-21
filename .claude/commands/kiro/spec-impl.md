@@ -26,6 +26,7 @@ Execute implementation tasks for feature **$1** using Test-Driven Development.
 **Read all necessary context**:
 - `.kiro/specs/$1/spec.json`, `requirements.md`, `design.md`, `tasks.md`
 - **Entire `.kiro/steering/` directory** for complete project memory
+- `.kiro/settings/rules/impl-execution.md` for implementation execution rules
 
 **Validate approvals**:
 - Verify tasks are approved in spec.json (stop if not, see Safety & Fallback)
@@ -70,6 +71,7 @@ For each selected task, follow Kent Beck's TDD cycle:
 - **Test Coverage**: All new code must have tests
 - **No Regressions**: Existing tests must continue to pass
 - **Design Alignment**: Implementation must follow design.md specifications
+- **Design Deviation Prohibition**: design.md と矛盾する制約に遭遇した場合、自己判断で設計を変更せず、必ず実装を中断してユーザーに判断を仰ぐこと（詳細は `impl-execution.md` を参照）
 </instructions>
 
 ## Tool Guidance

@@ -3,12 +3,12 @@ pub type Scalar = f64;
 
 /// 3 次元ベクトル。内部は `[x, y, z]` の順で格納する。
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Vector(pub(super) [f64; 3]);
+pub struct Vector([f64; 3]);
 
 impl Vector {
     /// 成分を指定して生成する。
     #[inline]
-    pub fn new(x: f64, y: f64, z: f64) -> Self {
+    pub const fn new(x: f64, y: f64, z: f64) -> Self {
         Self([x, y, z])
     }
 
@@ -39,13 +39,13 @@ impl Vector {
 
 /// 3×3 テンソル。内部は row-major 順 `[xx, xy, xz, yx, yy, yz, zx, zy, zz]` で格納する。
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Tensor(pub(super) [f64; 9]);
+pub struct Tensor([f64; 9]);
 
 impl Tensor {
     /// 9 成分を row-major 順で指定して生成する。
     #[inline]
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         xx: f64,
         xy: f64,
         xz: f64,
@@ -122,12 +122,12 @@ impl Tensor {
 
 /// 対称テンソル。上三角 row-major 順 `[xx, xy, xz, yy, yz, zz]` の 6 独立成分で格納する。
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct SymmTensor(pub(super) [f64; 6]);
+pub struct SymmTensor([f64; 6]);
 
 impl SymmTensor {
     /// 6 独立成分を指定して生成する。
     #[inline]
-    pub fn new(xx: f64, xy: f64, xz: f64, yy: f64, yz: f64, zz: f64) -> Self {
+    pub const fn new(xx: f64, xy: f64, xz: f64, yy: f64, yz: f64, zz: f64) -> Self {
         Self([xx, xy, xz, yy, yz, zz])
     }
 
@@ -176,12 +176,12 @@ impl SymmTensor {
 
 /// 球面テンソル。スカラー値 `s` で `sI`（単位テンソルのスカラー倍）を表す。
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct SphericalTensor(pub(super) f64);
+pub struct SphericalTensor(f64);
 
 impl SphericalTensor {
     /// スカラー値を指定して生成する。
     #[inline]
-    pub fn new(s: f64) -> Self {
+    pub const fn new(s: f64) -> Self {
         Self(s)
     }
 
