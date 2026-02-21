@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="assets/icon_1280x640_bg.png" width="100%">
+</p>
+
 # dugong
 A Rust CFD framework inspired by OpenFOAM
 
