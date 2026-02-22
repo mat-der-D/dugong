@@ -20,7 +20,7 @@ OpenFOAM の中核思想「コードは数学のように見えるべき」を�
 | 軸 | C++ / OpenFOAM | Rust で目指すもの |
 |---|---|---|
 | 記法の見た目 | `fvm::ddt(rho, U) + fvm::div(phi, U)` | ほぼ同等（`fvm.ddt(&rho, &u) + fvm.div(&phi, &u)`） |
-| 次元整合性 | 実行時検査（`dimensionSet`） | **コンパイル時検査**（const generics） |
+| 次元整合性 | 実行時検査（`dimensionSet`） | **コンパイル時検査**（`typenum` 型レベル整数） |
 | 陰的/陽的の混同防止 | 名前空間の慣例（`fvm::` / `fvc::`） | **型システムで強制**（`ImplicitOps` / `ExplicitOps`） |
 | スキーム選択の依存 | グローバル辞書からの暗黙参照 | **コンテキストオブジェクトへの明示的保持** |
 
@@ -30,19 +30,22 @@ OpenFOAM の中核思想「コードは数学のように見えるべき」を�
 
 ### 次元付き量
 
-const generics を用いてコンパイル時に次元を型パラメータとして保持する。
+`typenum` 型レベル整数を用いてコンパイル時に次元を型パラメータとして保持する（stable Rust）。
 
 ```rust
-/// 次元付き値。V は生の数値型（f64, [f64; 3] 等）
-struct Dim<V, const M: i8, const L: i8, const T: i8> {
+/// 次元付き値。V は生の数値型（f64, Vector 等）
+use typenum::{Integer, P1, P2, N1, N2, N3, Z0};
+struct Dim<V, M: Integer, L: Integer, T: Integer> {
     value: V,
+    _phantom: PhantomData<(M, L, T)>,
 }
 
-type Pressure    = Dim<f64,      1, -1, -2>;  // Pa
-type Velocity    = Dim<[f64; 3], 0,  1, -1>;  // m/s
-type Density     = Dim<f64,      1, -3,  0>;  // kg/m³
-type Viscosity   = Dim<f64,      1, -1, -1>;  // Pa·s
-type MassFlux    = Dim<f64,      1, -2, -1>;  // kg/(m²·s)
+// typenum: P1=+1, P2=+2, P3=+3, N1=-1, N2=-2, N3=-3, Z0=0
+type Pressure    = Dim<f64,    P1, N1, N2>;  // Pa
+type Velocity    = Dim<Vector, Z0, P1, N1>;  // m/s
+type Density     = Dim<f64,    P1, N3, Z0>;  // kg/m³
+type Viscosity   = Dim<f64,    P1, N1, N1>;  // Pa·s
+type MassFlux    = Dim<f64,    P1, N2, N1>;  // kg/(m²·s)
 ```
 
 - 同次元の加算：コンパイル時に保証

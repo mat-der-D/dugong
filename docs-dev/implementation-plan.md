@@ -67,7 +67,7 @@ P6              simple-solver-integration
 
 ## Phase 1: 基盤型システム (`types`)
 
-外部依存なし。プロジェクト全体の基盤。
+外部依存: `typenum`（型レベル次元算術）のみ。プロジェクト全体の基盤。
 
 ### Spec 1-1: `types-tensor`
 
@@ -135,15 +135,15 @@ P6              simple-solver-integration
 **前提**: Spec 1-1, 1-2
 
 **スコープ**:
-- `Dim<V, const M: i8, const L: i8, const T: i8>` 構造体
+- `Dim<V, M: Integer, L: Integer, T: Integer>` 構造体（`typenum` 型レベル整数）
 - `Quantity` trait: `type Value = V`
 - `Dim` への `Quantity` 実装
-- 同次元の加算・減算（const generics で次元一致を強制）
-- 異次元の乗除算（次元指数の算術）
+- 同次元の加算・減算（`typenum` で次元一致を型レベルで強制）
+- 異次元の乗除算（`Sum<M1, M2>` / `Diff<M1, M2>` による次元指数算術）
 - 物理量の型エイリアス:
-  - `Pressure = Dim<f64, 1, -1, -2>`
-  - `Velocity = Dim<Vector, 0, 1, -1>`
-  - `Density = Dim<f64, 1, -3, 0>` 等
+  - `Pressure = Dim<f64, P1, N1, N2>`
+  - `Velocity = Dim<Vector, Z0, P1, N1>`
+  - `Density = Dim<f64, P1, N3, Z0>` 等
 - `Quantity::Value: FieldValue` による接合
 
 **成果物**: `crates/types/src/dimension/` モジュール

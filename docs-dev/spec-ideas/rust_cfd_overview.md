@@ -26,11 +26,12 @@ OpenFOAM の設計思想を継承しつつ、Rust の型システムを活かし
 
 ## 2. 次元システムとPDE記法 → [types_and_notation](./rust_cfd_types_and_notation.md)
 
-**次元付き量：** `Dim<V, M, L, T>` で const generics によるコンパイル時次元検査。
+**次元付き量：** `Dim<V, M, L, T>` で `typenum` 型レベル整数によるコンパイル時次元検査（stable Rust）。
 
 ```rust
-type Pressure = Dim<f64, 1, -1, -2>;      // Pa
-type Velocity = Dim<[f64; 3], 0, 1, -1>;  // m/s
+use typenum::{P1, N1, N2, Z0};
+type Pressure = Dim<f64,    P1, N1, N2>;  // Pa
+type Velocity = Dim<Vector, Z0, P1, N1>;  // m/s
 ```
 
 **fvm/fvc 演算子：** コンテキストオブジェクト方式。スキーム設定を保持する `ImplicitOps` / `ExplicitOps` に演算子メソッドを定義。陰的/陽的の混同を型で防止。
@@ -49,7 +50,7 @@ type Velocity = Dim<[f64; 3], 0, 1, -1>;  // m/s
 - 第一層 `FieldValue`：`VolumeField<V>` が `V` に要求する基底（`Copy + Add + Sub + Mul<f64> + Neg + zero + mag`）
 - 第二層 `HasGrad` / `HasDiv`：associated type でランク昇降をコンパイル時表現
 
-**Quantity trait との接合：** `Dim<V, M, L, T>` → `Quantity { type Value = V }` → `V: FieldValue` で次元システムとテンソル型を接続。
+**Quantity trait との接合：** `Dim<V, M, L, T>` → `Quantity { type Value = V }` → `V: FieldValue` で次元システムとテンソル型を接続。`typenum::Integer` が次元パラメータの型境界。
 
 ---
 

@@ -26,14 +26,14 @@ dugong/
 
 ### `types` — 基底型システム
 
-- `Dim<V, M, L, T>`: 次元付き量（const generics）
+- `Dim<V, M, L, T>`: 次元付き量（typenum 型レベル整数）
 - `Quantity` trait: `type Value = V` を公開
 - テンソル型: `Scalar`, `Vector`, `Tensor`, `SymmTensor`, `SphericalTensor`
 - `FieldValue` trait: `Copy + Add + Sub + Mul<f64> + Neg + zero + mag`
 - ランク昇降 trait: `HasGrad`, `HasDiv`
 - 異型間演算の impl（約 25 個）
 
-**依存:** なし（外部クレート不要）
+**依存:** `typenum`（型レベル次元算術）
 
 ### `mesh` — メッシュ構造
 

@@ -39,10 +39,14 @@ impl VolumeField<'_, T, Stale> {
 }
 ```
 
-### const generics
+### 型レベル整数（typenum）
 ```rust
-// コンパイル時に次元を検査
-struct Dim<V, const M: i8, const L: i8, const T: i8> { value: V }
+// typenum::Integer による型レベル次元検査（stable Rust）
+use typenum::{Integer, P1, N1, N2, Z0};
+struct Dim<V, M: Integer, L: Integer, T: Integer> {
+    value: V,
+    _phantom: PhantomData<(M, L, T)>,
+}
 ```
 
 ## trait 設計

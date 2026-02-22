@@ -9,7 +9,7 @@
 ## エラーの分類
 
 ### コンパイル時検出（型システムで防止）
-- 次元の不整合（`Dim<V, M, L, T>` の const generics）
+- 次元の不整合（`Dim<V, M, L, T>` の typenum 型レベル整数）
 - 境界条件未評価のフィールド使用（`Fresh`/`Stale` typestate）
 - 陰的/陽的演算子の取り違え（`ImplicitOps`/`ExplicitOps` の型分離）
 - テンソルランクの不正な昇降（`HasGrad`/`HasDiv` の associated type）
