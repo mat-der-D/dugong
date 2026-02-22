@@ -19,7 +19,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 #### 受け入れ基準
 
-1. `PrimitiveMesh` は、点座標 (`Vec<[f64; 3]>`)・面定義 (`Vec<Vec<usize>>`)・所有者インデックス (`Vec<usize>`)・隣接セルインデックス (`Vec<usize>`)・内部面数 (`usize`)・セル数 (`usize`) を保持しなければならない。
+1. `PrimitiveMesh` は、点座標 (`Vec<Vector>`)・面定義 (`Vec<Vec<usize>>`)・所有者インデックス (`Vec<usize>`)・隣接セルインデックス (`Vec<usize>`)・内部面数 (`usize`)・セル数 (`usize`) を保持しなければならない。ここで `Vector` は `dugong-types` クレートで定義された3次元ベクトル newtype である。
 2. 構築時に不変条件（`owner` の長さ == `faces` の長さ、`neighbour` の長さ == `n_internal_faces`、全インデックスが範囲内）が検証される場合、`PrimitiveMesh` は構築を失敗させ `Err` を返さなければならない。
 3. `PrimitiveMesh` が構築された後、基本トポロジデータは変更不可（不変）でなければならない。
 4. 各面の頂点リスト長に制約はなく、任意多角形（三角形・四角形・多角形）を表現できなければならない。
@@ -33,7 +33,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 #### 受け入れ基準
 
-1. `PrimitiveMesh` は `cell_centres(&self) -> &[[f64; 3]]` メソッドを公開しなければならない。
+1. `PrimitiveMesh` は `cell_centres(&self) -> &[Vector]` メソッドを公開しなければならない。
 2. `PrimitiveMesh` は `cell_volumes(&self) -> &[f64]` メソッドを公開しなければならない。
 3. 各メソッドが初めて呼ばれたとき、`PrimitiveMesh` は点座標・面・所有者から値を計算し内部にキャッシュしなければならない。
 4. 同じメソッドを2回目以降に呼んだとき、`PrimitiveMesh` はキャッシュ済みの値を返し再計算を行ってはならない。
@@ -48,8 +48,8 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 #### 受け入れ基準
 
-1. `PrimitiveMesh` は `face_centres(&self) -> &[[f64; 3]]` メソッドを公開しなければならない。
-2. `PrimitiveMesh` は `face_areas(&self) -> &[[f64; 3]]` メソッドを公開しなければならない（戻り値は面積ベクトル: 法線方向 × 面積スカラー）。
+1. `PrimitiveMesh` は `face_centres(&self) -> &[Vector]` メソッドを公開しなければならない。
+2. `PrimitiveMesh` は `face_areas(&self) -> &[Vector]` メソッドを公開しなければならない（戻り値は面積ベクトル: 法線方向 × 面積スカラー）。
 3. 各メソッドが初めて呼ばれたとき、`PrimitiveMesh` は点座標と面定義から値を計算しキャッシュしなければならない。
 4. 同じメソッドを2回目以降に呼んだとき、`PrimitiveMesh` はキャッシュ済みの値を返し再計算を行ってはならない。
 5. 面積ベクトルは `owner` セルから `neighbour` セルへ向かう向きを正とし、OpenFOAM の慣行と一致しなければならない。
@@ -93,7 +93,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 #### 受け入れ基準
 
-1. `PrimitiveMesh` は `points(&self) -> &[[f64; 3]]` メソッドを公開しなければならない。
+1. `PrimitiveMesh` は `points(&self) -> &[Vector]` メソッドを公開しなければならない。
 2. `PrimitiveMesh` は `faces(&self) -> &[Vec<usize>]` メソッドを公開しなければならない。
 3. `PrimitiveMesh` は `owner(&self) -> &[usize]` メソッドを公開しなければならない。
 4. `PrimitiveMesh` は `neighbour(&self) -> &[usize]` メソッドを公開しなければならない。

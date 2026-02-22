@@ -31,7 +31,7 @@ pub type Face = Vec<usize>;  // 任意多角形
 
 pub struct PrimitiveMesh {
     // 基本データ（構築時確定、不変）
-    points: Vec<[f64; 3]>,
+    points: Vec<Vector>,
     faces: Vec<Face>,
     owner: Vec<usize>,
     neighbour: Vec<usize>,      // len == n_internal_faces
@@ -39,10 +39,10 @@ pub struct PrimitiveMesh {
     n_cells: usize,
 
     // 遅延計算ジオメトリ
-    cell_centres: OnceCell<Vec<[f64; 3]>>,
-    face_centres: OnceCell<Vec<[f64; 3]>>,
+    cell_centres: OnceCell<Vec<Vector>>,
+    face_centres: OnceCell<Vec<Vector>>,
     cell_volumes: OnceCell<Vec<f64>>,
-    face_areas:   OnceCell<Vec<[f64; 3]>>,   // 面積ベクトル（法線×面積）
+    face_areas:   OnceCell<Vec<Vector>>,   // 面積ベクトル（法線×面積）
 
     // 遅延計算接続情報
     cell_cells:  OnceCell<Vec<Vec<usize>>>,
@@ -90,7 +90,7 @@ pub struct PolyMesh {
     cell_zones: Vec<Zone>,
     face_zones: Vec<FaceZone>,
     point_zones: Vec<Zone>,
-    old_points: Option<Vec<[f64; 3]>>,       // 非定常/メッシュ運動用
+    old_points: Option<Vec<Vector>>,          // 非定常/メッシュ運動用
     global_data: Option<GlobalMeshData>,      // シリアル時 None
 }
 
@@ -143,13 +143,13 @@ pub trait PolyPatch: Send + Sync {
     fn as_coupled_mut(&mut self) -> Option<&mut dyn CoupledPatch> { None }
 
     // メッシュ操作フック（デフォルト: 何もしない）
-    fn move_points(&mut self, _new_points: &[[f64; 3]]) {}
+    fn move_points(&mut self, _new_points: &[Vector]) {}
 }
 
 pub trait CoupledPatch: PolyPatch {
     fn face_cells(&self) -> &[usize];
-    fn neighbour_cell_centres(&self) -> &[[f64; 3]];
-    fn set_neighbour_cell_centres(&mut self, centres: Vec<[f64; 3]>);
+    fn neighbour_cell_centres(&self) -> &[Vector];
+    fn set_neighbour_cell_centres(&mut self, centres: Vec<Vector>);
     fn neighbour_rank(&self) -> Option<i32>;  // ProcessorPatch のみ Some
     fn transform(&self) -> &Transform;
 }
@@ -160,13 +160,13 @@ pub trait CoupledPatch: PolyPatch {
 ```rust
 pub trait FvPatch: Send + Sync {
     fn poly_patch(&self) -> &dyn PolyPatch;
-    fn delta(&self, mesh: &PrimitiveMesh) -> Vec<[f64; 3]>;
+    fn delta(&self, mesh: &PrimitiveMesh) -> Vec<Vector>;
     fn weights(&self, mesh: &PrimitiveMesh) -> Vec<f64>;
 }
 
 pub trait CoupledFvPatch: FvPatch {
     fn poly_coupled_patch(&self) -> &dyn CoupledPatch;
-    fn delta_neighbour(&self, mesh: &PrimitiveMesh) -> Vec<[f64; 3]>;
+    fn delta_neighbour(&self, mesh: &PrimitiveMesh) -> Vec<Vector>;
 }
 ```
 
@@ -222,7 +222,7 @@ pub struct FvMesh {
     weights: OnceCell<Vec<f64>>,
     delta_coeffs: OnceCell<Vec<f64>>,
     non_orth_delta_coeffs: OnceCell<Vec<f64>>,
-    non_orth_correction_vectors: OnceCell<Vec<[f64; 3]>>,
+    non_orth_correction_vectors: OnceCell<Vec<Vector>>,
 
     // 旧時刻データ（非定常計算用）
     v0: Option<Vec<f64>>,
@@ -329,7 +329,7 @@ pub fn build_fv_mesh(
 
 ```rust
 impl FvMesh {
-    pub fn move_points(&mut self, new_points: Vec<[f64; 3]>, world: &SystemCommunicator) {
+    pub fn move_points(&mut self, new_points: Vec<Vector>, world: &SystemCommunicator) {
         self.poly.primitive.set_points(new_points);
         self.clear_geometry();
 
