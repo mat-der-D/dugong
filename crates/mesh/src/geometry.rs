@@ -27,8 +27,8 @@ pub(crate) fn compute_face_geometry(points: &[Vector], face: &[usize]) -> (Vecto
         let v_cur = points[face[i]];
         let v_next = points[face[(i + 1) % n]];
 
-        // 三角形面積ベクトル: 0.5 * (v_next - p_ref) × (v_cur - p_ref)
-        let tri_area_vec = (v_next - p_ref).cross(&(v_cur - p_ref)) * 0.5;
+        // 三角形面積ベクトル: 0.5 * (v_cur - p_ref) × (v_next - p_ref)
+        let tri_area_vec = (v_cur - p_ref).cross(&(v_next - p_ref)) * 0.5;
         let tri_area = tri_area_vec.mag();
         let tri_center = (v_cur + v_next + p_ref) / 3.0;
 
@@ -201,7 +201,7 @@ mod tests {
     use super::*;
     use dugong_types::tensor::Vector;
 
-    /// 単位正方形面（z=0 平面、反時計回り → 法線 +z）
+    /// 単位正方形面（z=0 平面、owner 側 (-z) から見て反時計回り → 法線 -z）
     fn square_points() -> Vec<Vector> {
         vec![
             Vector::new(0.0, 0.0, 0.0),
@@ -225,15 +225,15 @@ mod tests {
         ]
     }
 
-    /// 単位立方体の 6 面（owner 側から見て外向き法線）
+    /// 単位立方体の 6 面（owner 側から見て反時計回り → 右手の法則で外向き法線）
     fn cube_faces() -> Vec<Vec<usize>> {
         vec![
-            vec![0, 1, 2, 3], // z-
-            vec![4, 7, 6, 5], // z+
-            vec![0, 4, 5, 1], // y-
-            vec![2, 6, 7, 3], // y+
-            vec![0, 3, 7, 4], // x-
-            vec![1, 5, 6, 2], // x+
+            vec![0, 3, 2, 1], // f0: z- (normal -z)
+            vec![4, 5, 6, 7], // f1: z+ (normal +z)
+            vec![0, 1, 5, 4], // f2: y- (normal -y)
+            vec![3, 7, 6, 2], // f3: y+ (normal +y)
+            vec![0, 4, 7, 3], // f4: x- (normal -x)
+            vec![1, 2, 6, 5], // f5: x+ (normal +x)
         ]
     }
 
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn face_geometry_square_area_magnitude() {
         let pts = square_points();
-        let (_, area_vec) = compute_face_geometry(&pts, &[0, 1, 2, 3]);
+        let (_, area_vec) = compute_face_geometry(&pts, &[0, 3, 2, 1]);
         let area = area_vec.mag();
         assert!((area - 1.0).abs() < 1e-12, "expected area 1.0, got {area}");
     }
@@ -250,8 +250,9 @@ mod tests {
     #[test]
     fn face_geometry_square_area_direction() {
         let pts = square_points();
-        let (_, area_vec) = compute_face_geometry(&pts, &[0, 1, 2, 3]);
-        // cross product 順序: (v_next - p_ref) × (v_cur - p_ref) → 反時計回り入力で -z
+        let (_, area_vec) = compute_face_geometry(&pts, &[0, 3, 2, 1]);
+        // 設計通り: 0.5 * (v_cur - p_ref) × (v_next - p_ref) で owner 外向き法線を生成
+        // 頂点は owner 側 (-z) から見て反時計回り → 右手の法則で -z 方向
         assert!(
             area_vec.z() < 0.0,
             "expected -z normal from cross product convention"
@@ -263,7 +264,7 @@ mod tests {
     #[test]
     fn face_geometry_square_centroid() {
         let pts = square_points();
-        let (center, _) = compute_face_geometry(&pts, &[0, 1, 2, 3]);
+        let (center, _) = compute_face_geometry(&pts, &[0, 3, 2, 1]);
         let expected = Vector::new(0.5, 0.5, 0.0);
         let diff = (center - expected).mag();
         assert!(diff < 1e-12, "centroid error {diff}");
@@ -333,17 +334,17 @@ mod tests {
             Vector::new(2.0, 1.0, 1.0), // 11
         ];
         let faces = vec![
-            vec![1, 5, 6, 2],   // f0: internal (owner=0, neighbor=1)
-            vec![0, 1, 2, 3],   // f1: cell0 boundary
-            vec![4, 7, 6, 5],   // f2: cell0 boundary
-            vec![0, 4, 5, 1],   // f3: cell0 boundary
-            vec![2, 6, 7, 3],   // f4: cell0 boundary
-            vec![0, 3, 7, 4],   // f5: cell0 boundary
-            vec![8, 10, 11, 9], // f6: cell1 boundary
-            vec![1, 5, 10, 8],  // f7: cell1 boundary
-            vec![2, 9, 11, 6],  // f8: cell1 boundary
-            vec![1, 8, 9, 2],   // f9: cell1 boundary
-            vec![5, 6, 11, 10], // f10: cell1 boundary
+            vec![1, 2, 6, 5],   // f0:  internal (owner=0→neighbor=1, normal +x)
+            vec![0, 3, 2, 1],   // f1:  cell0 z- (normal -z)
+            vec![4, 5, 6, 7],   // f2:  cell0 z+ (normal +z)
+            vec![0, 1, 5, 4],   // f3:  cell0 y- (normal -y)
+            vec![3, 7, 6, 2],   // f4:  cell0 y+ (normal +y)
+            vec![0, 4, 7, 3],   // f5:  cell0 x- (normal -x)
+            vec![8, 9, 11, 10], // f6:  cell1 x+ (normal +x)
+            vec![1, 8, 10, 5],  // f7:  cell1 y- (normal -y)
+            vec![2, 6, 11, 9],  // f8:  cell1 y+ (normal +y)
+            vec![1, 2, 9, 8],   // f9:  cell1 z- (normal -z)
+            vec![5, 10, 11, 6], // f10: cell1 z+ (normal +z)
         ];
         let owner = vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
         let neighbor = vec![1];

@@ -278,12 +278,12 @@ mod tests {
             Vector::new(0.0, 1.0, 1.0), // 7
         ];
         let faces = vec![
-            vec![0, 1, 2, 3], // f0: z- face (outward normal: -z)
-            vec![4, 7, 6, 5], // f1: z+ face (outward normal: +z)
-            vec![0, 4, 5, 1], // f2: y- face (outward normal: -y)
-            vec![2, 6, 7, 3], // f3: y+ face (outward normal: +y)
-            vec![0, 3, 7, 4], // f4: x- face (outward normal: -x)
-            vec![1, 5, 6, 2], // f5: x+ face (outward normal: +x)
+            vec![0, 3, 2, 1], // f0: z- face (outward normal: -z)
+            vec![4, 5, 6, 7], // f1: z+ face (outward normal: +z)
+            vec![0, 1, 5, 4], // f2: y- face (outward normal: -y)
+            vec![3, 7, 6, 2], // f3: y+ face (outward normal: +y)
+            vec![0, 4, 7, 3], // f4: x- face (outward normal: -x)
+            vec![1, 2, 6, 5], // f5: x+ face (outward normal: +x)
         ];
         let owner = vec![0, 0, 0, 0, 0, 0];
         let neighbor = vec![];
@@ -309,17 +309,17 @@ mod tests {
         ];
         // Internal face first (OpenFOAM convention)
         let faces = vec![
-            vec![1, 5, 6, 2],   // f0: internal face at x=1 (owner=0→neighbor=1, normal +x)
-            vec![0, 1, 2, 3],   // f1: cell0 z- boundary (normal -z)
-            vec![4, 7, 6, 5],   // f2: cell0 z+ boundary (normal +z)
-            vec![0, 4, 5, 1],   // f3: cell0 y- boundary (normal -y)
-            vec![2, 6, 7, 3],   // f4: cell0 y+ boundary (normal +y)
-            vec![0, 3, 7, 4],   // f5: cell0 x- boundary (normal -x)
-            vec![8, 10, 11, 9], // f6: cell1 x+ boundary (normal +x)
-            vec![1, 5, 10, 8],  // f7: cell1 y- boundary (normal -y)
-            vec![2, 9, 11, 6],  // f8: cell1 y+ boundary (normal +y)
-            vec![1, 8, 9, 2],   // f9: cell1 z- boundary (normal -z)
-            vec![5, 6, 11, 10], // f10: cell1 z+ boundary (normal +z)
+            vec![1, 2, 6, 5],   // f0:  internal (owner=0→neighbor=1, normal +x)
+            vec![0, 3, 2, 1],   // f1:  cell0 z- (normal -z)
+            vec![4, 5, 6, 7],   // f2:  cell0 z+ (normal +z)
+            vec![0, 1, 5, 4],   // f3:  cell0 y- (normal -y)
+            vec![3, 7, 6, 2],   // f4:  cell0 y+ (normal +y)
+            vec![0, 4, 7, 3],   // f5:  cell0 x- (normal -x)
+            vec![8, 9, 11, 10], // f6:  cell1 x+ (normal +x)
+            vec![1, 8, 10, 5],  // f7:  cell1 y- (normal -y)
+            vec![2, 6, 11, 9],  // f8:  cell1 y+ (normal +y)
+            vec![1, 2, 9, 8],   // f9:  cell1 z- (normal -z)
+            vec![5, 10, 11, 6], // f10: cell1 z+ (normal +z)
         ];
         let owner = vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
         let neighbor = vec![1]; // face 0 connects cell 0 and cell 1

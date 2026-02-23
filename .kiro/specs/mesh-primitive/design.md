@@ -303,7 +303,7 @@ pub enum MeshError {
 1. 面の各頂点の単純平均を参照点 `p_ref` とする
 2. 面を `p_ref` を頂点とする三角形列に分割する（面の頂点 `v[i]`, `v[(i+1) % n]`, `p_ref`）
 3. 各三角形の重心 `tri_center = (v[i] + v[i+1] + p_ref) / 3`
-4. 各三角形の面積ベクトル `tri_area_vec = 0.5 * (v[i+1] - p_ref) × (v[i] - p_ref)`
+4. 各三角形の面積ベクトル `tri_area_vec = 0.5 * (v[i] - p_ref) × (v[i+1] - p_ref)`
 5. 面積加重平均: `face_center = Σ(tri_center * |tri_area_vec|) / Σ|tri_area_vec|`
 
 **面積ベクトル（face area vector）の計算手順:**
