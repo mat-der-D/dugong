@@ -195,3 +195,248 @@ pub(crate) fn compute_cell_points(
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dugong_types::tensor::Vector;
+
+    /// 単位正方形面（z=0 平面、反時計回り → 法線 +z）
+    fn square_points() -> Vec<Vector> {
+        vec![
+            Vector::new(0.0, 0.0, 0.0),
+            Vector::new(1.0, 0.0, 0.0),
+            Vector::new(1.0, 1.0, 0.0),
+            Vector::new(0.0, 1.0, 0.0),
+        ]
+    }
+
+    /// 単位立方体の 8 点
+    fn cube_points() -> Vec<Vector> {
+        vec![
+            Vector::new(0.0, 0.0, 0.0), // 0
+            Vector::new(1.0, 0.0, 0.0), // 1
+            Vector::new(1.0, 1.0, 0.0), // 2
+            Vector::new(0.0, 1.0, 0.0), // 3
+            Vector::new(0.0, 0.0, 1.0), // 4
+            Vector::new(1.0, 0.0, 1.0), // 5
+            Vector::new(1.0, 1.0, 1.0), // 6
+            Vector::new(0.0, 1.0, 1.0), // 7
+        ]
+    }
+
+    /// 単位立方体の 6 面（owner 側から見て外向き法線）
+    fn cube_faces() -> Vec<Vec<usize>> {
+        vec![
+            vec![0, 1, 2, 3], // z-
+            vec![4, 7, 6, 5], // z+
+            vec![0, 4, 5, 1], // y-
+            vec![2, 6, 7, 3], // y+
+            vec![0, 3, 7, 4], // x-
+            vec![1, 5, 6, 2], // x+
+        ]
+    }
+
+    // ===== compute_face_geometry =====
+
+    #[test]
+    fn face_geometry_square_area_magnitude() {
+        let pts = square_points();
+        let (_, area_vec) = compute_face_geometry(&pts, &[0, 1, 2, 3]);
+        let area = area_vec.mag();
+        assert!((area - 1.0).abs() < 1e-12, "expected area 1.0, got {area}");
+    }
+
+    #[test]
+    fn face_geometry_square_area_direction() {
+        let pts = square_points();
+        let (_, area_vec) = compute_face_geometry(&pts, &[0, 1, 2, 3]);
+        // cross product 順序: (v_next - p_ref) × (v_cur - p_ref) → 反時計回り入力で -z
+        assert!(
+            area_vec.z() < 0.0,
+            "expected -z normal from cross product convention"
+        );
+        assert!(area_vec.x().abs() < 1e-12);
+        assert!(area_vec.y().abs() < 1e-12);
+    }
+
+    #[test]
+    fn face_geometry_square_centroid() {
+        let pts = square_points();
+        let (center, _) = compute_face_geometry(&pts, &[0, 1, 2, 3]);
+        let expected = Vector::new(0.5, 0.5, 0.0);
+        let diff = (center - expected).mag();
+        assert!(diff < 1e-12, "centroid error {diff}");
+    }
+
+    #[test]
+    fn face_geometry_triangle() {
+        let pts = vec![
+            Vector::new(0.0, 0.0, 0.0),
+            Vector::new(2.0, 0.0, 0.0),
+            Vector::new(0.0, 2.0, 0.0),
+        ];
+        let (center, area_vec) = compute_face_geometry(&pts, &[0, 1, 2]);
+        // 三角形面積 = 2.0
+        let area = area_vec.mag();
+        assert!((area - 2.0).abs() < 1e-12, "expected area 2.0, got {area}");
+        // 重心 = (2/3, 2/3, 0)
+        let expected = Vector::new(2.0 / 3.0, 2.0 / 3.0, 0.0);
+        let diff = (center - expected).mag();
+        assert!(diff < 1e-12, "triangle centroid error {diff}");
+    }
+
+    // ===== compute_cell_geometry =====
+
+    #[test]
+    fn cell_geometry_single_cube_volume() {
+        let pts = cube_points();
+        let faces = cube_faces();
+        let owner = vec![0; 6];
+        let neighbor: Vec<usize> = vec![];
+        let (vols, _) = compute_cell_geometry(&pts, &faces, &owner, &neighbor, 0, 1);
+        assert_eq!(vols.len(), 1);
+        assert!(
+            (vols[0] - 1.0).abs() < 1e-10,
+            "expected volume 1.0, got {}",
+            vols[0]
+        );
+    }
+
+    #[test]
+    fn cell_geometry_single_cube_center() {
+        let pts = cube_points();
+        let faces = cube_faces();
+        let owner = vec![0; 6];
+        let neighbor: Vec<usize> = vec![];
+        let (_, centers) = compute_cell_geometry(&pts, &faces, &owner, &neighbor, 0, 1);
+        let expected = Vector::new(0.5, 0.5, 0.5);
+        let diff = (centers[0] - expected).mag();
+        assert!(diff < 1e-10, "center error {diff}");
+    }
+
+    #[test]
+    fn cell_geometry_two_cells() {
+        // セル0: x=0..1, セル1: x=1..2
+        let pts = vec![
+            Vector::new(0.0, 0.0, 0.0), // 0
+            Vector::new(1.0, 0.0, 0.0), // 1
+            Vector::new(1.0, 1.0, 0.0), // 2
+            Vector::new(0.0, 1.0, 0.0), // 3
+            Vector::new(0.0, 0.0, 1.0), // 4
+            Vector::new(1.0, 0.0, 1.0), // 5
+            Vector::new(1.0, 1.0, 1.0), // 6
+            Vector::new(0.0, 1.0, 1.0), // 7
+            Vector::new(2.0, 0.0, 0.0), // 8
+            Vector::new(2.0, 1.0, 0.0), // 9
+            Vector::new(2.0, 0.0, 1.0), // 10
+            Vector::new(2.0, 1.0, 1.0), // 11
+        ];
+        let faces = vec![
+            vec![1, 5, 6, 2],   // f0: internal (owner=0, neighbor=1)
+            vec![0, 1, 2, 3],   // f1: cell0 boundary
+            vec![4, 7, 6, 5],   // f2: cell0 boundary
+            vec![0, 4, 5, 1],   // f3: cell0 boundary
+            vec![2, 6, 7, 3],   // f4: cell0 boundary
+            vec![0, 3, 7, 4],   // f5: cell0 boundary
+            vec![8, 10, 11, 9], // f6: cell1 boundary
+            vec![1, 5, 10, 8],  // f7: cell1 boundary
+            vec![2, 9, 11, 6],  // f8: cell1 boundary
+            vec![1, 8, 9, 2],   // f9: cell1 boundary
+            vec![5, 6, 11, 10], // f10: cell1 boundary
+        ];
+        let owner = vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        let neighbor = vec![1];
+        let (vols, centers) = compute_cell_geometry(&pts, &faces, &owner, &neighbor, 1, 2);
+        for i in 0..2 {
+            assert!(
+                (vols[i] - 1.0).abs() < 1e-10,
+                "cell {i} volume error, got {}",
+                vols[i]
+            );
+        }
+        let expected = [Vector::new(0.5, 0.5, 0.5), Vector::new(1.5, 0.5, 0.5)];
+        for i in 0..2 {
+            let diff = (centers[i] - expected[i]).mag();
+            assert!(diff < 1e-10, "cell {i} center error {diff}");
+        }
+    }
+
+    // ===== compute_cell_faces =====
+
+    #[test]
+    fn cell_faces_single_cell() {
+        let owner = vec![0, 0, 0, 0, 0, 0];
+        let neighbor: Vec<usize> = vec![];
+        let cf = compute_cell_faces(&owner, &neighbor, 0, 1);
+        assert_eq!(cf.len(), 1);
+        assert_eq!(cf[0], vec![0, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn cell_faces_two_cells_internal_face_in_both() {
+        // f0: internal (owner=0, neighbor=1), f1..f5: cell0, f6..f10: cell1
+        let owner = vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        let neighbor = vec![1];
+        let cf = compute_cell_faces(&owner, &neighbor, 1, 2);
+        assert!(cf[0].contains(&0), "cell 0 should contain internal face 0");
+        assert!(cf[1].contains(&0), "cell 1 should contain internal face 0");
+        assert_eq!(cf[0].len(), 6);
+        assert_eq!(cf[1].len(), 6);
+    }
+
+    // ===== compute_cell_cells =====
+
+    #[test]
+    fn cell_cells_no_internal_faces() {
+        let cf = vec![vec![0, 1, 2, 3, 4, 5]];
+        let owner = vec![0; 6];
+        let neighbor: Vec<usize> = vec![];
+        let cc = compute_cell_cells(&cf, &owner, &neighbor, 0, 1);
+        assert_eq!(cc.len(), 1);
+        assert!(cc[0].is_empty());
+    }
+
+    #[test]
+    fn cell_cells_two_cells_symmetric() {
+        let cf = vec![vec![0, 1, 2, 3, 4, 5], vec![0, 6, 7, 8, 9, 10]];
+        let owner = vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        let neighbor = vec![1];
+        let cc = compute_cell_cells(&cf, &owner, &neighbor, 1, 2);
+        assert_eq!(cc[0], vec![1]);
+        assert_eq!(cc[1], vec![0]);
+    }
+
+    // ===== compute_cell_points =====
+
+    #[test]
+    fn cell_points_single_cube() {
+        let faces = cube_faces();
+        let cf = vec![vec![0, 1, 2, 3, 4, 5]];
+        let cp = compute_cell_points(&cf, &faces, 1);
+        assert_eq!(cp.len(), 1);
+        assert_eq!(cp[0], vec![0, 1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn cell_points_no_duplicates() {
+        let faces = cube_faces();
+        let cf = vec![vec![0, 1, 2, 3, 4, 5]];
+        let cp = compute_cell_points(&cf, &faces, 1);
+        let mut sorted = cp[0].clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(cp[0].len(), sorted.len());
+    }
+
+    #[test]
+    fn cell_points_sorted() {
+        // BTreeSet を使用しているため、結果はソート済みであるべき
+        let faces = cube_faces();
+        let cf = vec![vec![0, 1, 2, 3, 4, 5]];
+        let cp = compute_cell_points(&cf, &faces, 1);
+        let mut sorted = cp[0].clone();
+        sorted.sort();
+        assert_eq!(cp[0], sorted);
+    }
+}
