@@ -15,7 +15,7 @@
   - _Requirements: 1.1, 6.1_
 
 - [x] 2. `MeshError` エラー型の実装（error.rs）
-  - `OwnerLengthMismatch`・`NeighbourLengthMismatch`・`OwnerIndexOutOfRange`・`NeighbourIndexOutOfRange`・`PointIndexOutOfRange` の5バリアントを定義する
+  - `OwnerLengthMismatch`・`NeighborLengthMismatch`・`OwnerIndexOutOfRange`・`NeighborIndexOutOfRange`・`PointIndexOutOfRange` の5バリアントを定義する
   - 各バリアントにエラー発生箇所を特定できるフィールド（`face`・`cell`・`n_cells`・`n_points`・`expected`・`got` など）を設ける
   - `#[derive(Debug, thiserror::Error)]` でトレイトを自動導出し、各バリアントに `#[error("...")]` で具体的なメッセージを付与する
   - `std::error::Error` が実装されていることを確認する
@@ -24,24 +24,24 @@
 - [x] 3. `PrimitiveMesh` 基本実装（primitive_mesh.rs）
 
 - [x] 3.1 構造体の定義
-  - 基本データフィールド（`points: Vec<Vector>`・`faces: Vec<Vec<usize>>`・`owner: Vec<usize>`・`neighbour: Vec<usize>`・`n_internal_faces: usize`・`n_cells: usize`）を定義する
-  - 遅延計算フィールド（`cell_centres`・`cell_volumes`・`face_centres`・`face_areas`・`cell_cells`・`cell_faces`・`cell_points` として各 `std::sync::OnceLock`）を定義する
+  - 基本データフィールド（`points: Vec<Vector>`・`faces: Vec<Vec<usize>>`・`owner: Vec<usize>`・`neighbor: Vec<usize>`・`n_internal_faces: usize`・`n_cells: usize`）を定義する
+  - 遅延計算フィールド（`cell_centers`・`cell_volumes`・`face_centers`・`face_areas`・`cell_cells`・`cell_faces`・`cell_points` として各 `std::sync::OnceLock`）を定義する
   - 全フィールドを非 `pub` として不変性を確保し、`unsafe` コードは一切使用しない
   - `dugong_types::Vector` を座標型・ジオメトリデータ型として採用する
   - _Requirements: 1.1, 1.3, 1.4, 5.1, 5.4_
 
 - [x] 3.2 コンストラクタの不変条件バリデーション
-  - `PrimitiveMesh::new(points, faces, owner, neighbour, n_internal_faces, n_cells) -> Result<Self, MeshError>` を実装する
+  - `PrimitiveMesh::new(points, faces, owner, neighbor, n_internal_faces, n_cells) -> Result<Self, MeshError>` を実装する
   - `owner.len() != faces.len()` なら `OwnerLengthMismatch` を返す
-  - `neighbour.len() != n_internal_faces` なら `NeighbourLengthMismatch` を返す
+  - `neighbor.len() != n_internal_faces` なら `NeighborLengthMismatch` を返す
   - `owner` に `n_cells` 以上のインデックスがあれば `OwnerIndexOutOfRange` を返す
-  - `neighbour` に `n_cells` 以上のインデックスがあれば `NeighbourIndexOutOfRange` を返す
+  - `neighbor` に `n_cells` 以上のインデックスがあれば `NeighborIndexOutOfRange` を返す
   - 各面の点インデックスに `points.len()` 以上の値があれば `PointIndexOutOfRange` を返す
   - 全検証通過後、`OnceLock` を未初期化状態として `Ok(Self)` を返す
   - _Requirements: 1.2, 1.3, 1.5, 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [x] 3.3 基本アクセサの実装
-  - `points(&self) -> &[Vector]`・`faces(&self) -> &[Vec<usize>]`・`owner(&self) -> &[usize]`・`neighbour(&self) -> &[usize]` を実装する
+  - `points(&self) -> &[Vector]`・`faces(&self) -> &[Vec<usize>]`・`owner(&self) -> &[usize]`・`neighbor(&self) -> &[usize]` を実装する
   - `n_internal_faces(&self) -> usize`・`n_cells(&self) -> usize`・`n_faces(&self) -> usize`・`n_points(&self) -> usize` を実装する
   - いずれも `&self` のみで呼び出せる不変メソッドとし、内部フィールドへのスライス参照を返す
   - _Requirements: 1.4, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8_
@@ -56,9 +56,9 @@
   - _Requirements: 3.5, 3.6_
 
 - [x] 4.2 (P) 面ジオメトリ遅延計算アクセサの実装（primitive_mesh.rs）
-  - `face_centres(&self) -> &[Vector]` と `face_areas(&self) -> &[Vector]` を `OnceLock::get_or_init` パターンで実装する
-  - 全面に対して `compute_face_geometry` を呼び出し、`face_centres` と `face_areas` を同時にキャッシュする
-  - 面積ベクトルの向きが頂点順序（OpenFOAM 慣行: 内部面は owner → neighbour、境界面は外向き）に従うことを確認する
+  - `face_centers(&self) -> &[Vector]` と `face_areas(&self) -> &[Vector]` を `OnceLock::get_or_init` パターンで実装する
+  - 全面に対して `compute_face_geometry` を呼び出し、`face_centers` と `face_areas` を同時にキャッシュする
+  - 面積ベクトルの向きが頂点順序（OpenFOAM 慣行: 内部面は owner → neighbor、境界面は外向き）に従うことを確認する
   - 2回目以降の呼び出しでキャッシュ済みの値を返すことを確認する
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.7_
 
@@ -66,13 +66,13 @@
 
 - [x] 5.1 (P) セル体積・重心計算関数の実装（geometry.rs）
   - 各セルの全所属面について面中心と面積ベクトルを計算し、ピラミッド分解でセル体積を計算する内部関数を実装する
-  - ピラミッド体積: `face_area_vec · (face_centre - ref_point) / 3`（owner セルは正、neighbour セルは負の寄与）
-  - 各ピラミッドの重心（`0.75 * ref_point + 0.25 * face_centre`）を体積加重平均してセル重心を計算する
+  - ピラミッド体積: `face_area_vec · (face_center - ref_point) / 3`（owner セルは正、neighbor セルは負の寄与）
+  - 各ピラミッドの重心（`0.75 * ref_point + 0.25 * face_center`）を体積加重平均してセル重心を計算する
   - 面ジオメトリ計算には `compute_face_geometry`（4.1 で実装済み）を内部利用する
   - _Requirements: 2.5, 2.6_
 
 - [x] 5.2 (P) セルジオメトリ遅延計算アクセサの実装（primitive_mesh.rs）
-  - `cell_volumes(&self) -> &[f64]` と `cell_centres(&self) -> &[Vector]` を `OnceLock` パターンで実装する
+  - `cell_volumes(&self) -> &[f64]` と `cell_centers(&self) -> &[Vector]` を `OnceLock` パターンで実装する
   - 2 つのアクセサは OnceLock 初期化ブロック内でセル体積とセル重心を一括して計算して効率化する
   - キャッシュ済みの場合は再計算せず既存のスライスを返す
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
@@ -80,7 +80,7 @@
 - [x] 6. セル接続情報の実装
 
 - [x] 6.1 (P) cell_faces・cell_cells・cell_points 計算関数の実装（geometry.rs）
-  - `owner`/`neighbour` を全面走査して各セルの所属面インデックスリストを構築する関数を実装する
+  - `owner`/`neighbor` を全面走査して各セルの所属面インデックスリストを構築する関数を実装する
   - 内部面のみを対象として各セルの隣接セルリストを導出する関数を実装する（境界面は隣接セルなし）
   - 各セルの所属面が参照する頂点インデックスを `BTreeSet` 等で重複なく収集する関数を実装する
   - _Requirements: 4.4, 4.5, 4.6, 4.7_
@@ -98,7 +98,7 @@
   - _Requirements: 8.1, 8.2_
 
 - [x] 7.2 コンストラクタのエラー処理テスト
-  - owner 長さ不一致・neighbour 長さ不一致・owner インデックス範囲外・点インデックス範囲外の各ケースで `Err` が返ることを検証する
+  - owner 長さ不一致・neighbor 長さ不一致・owner インデックス範囲外・点インデックス範囲外の各ケースで `Err` が返ることを検証する
   - 正常ケース（単位立方体）で `Ok(mesh)` が返ることも検証する
   - _Requirements: 7.2, 7.3, 7.4, 7.5, 8.5_
 

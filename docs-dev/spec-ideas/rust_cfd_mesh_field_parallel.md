@@ -166,7 +166,7 @@ trait PhysicalBC<T> {
 
 ```rust
 struct ProcessorPatch<T> {
-    neighbour_rank: i32,
+    neighbor_rank: i32,
     face_cells: Vec<usize>,   // 送信すべきローカルセル
     send_buf: Vec<T>,
     recv_buf: Vec<T>,          // 受信した隣接プロセスの値

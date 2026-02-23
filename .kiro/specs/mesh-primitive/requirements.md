@@ -20,10 +20,10 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 #### 受け入れ基準
 
 1. `PrimitiveMesh` は、点座標 (`Vec<Vector>`)・面定義 (`Vec<Vec<usize>>`)・所有者インデックス (`Vec<usize>`)・隣接セルインデックス (`Vec<usize>`)・内部面数 (`usize`)・セル数 (`usize`) を保持しなければならない。ここで `Vector` は `dugong-types` クレートで定義された3次元ベクトル newtype である。
-2. 構築時に不変条件（`owner` の長さ == `faces` の長さ、`neighbour` の長さ == `n_internal_faces`、全インデックスが範囲内）が検証される場合、`PrimitiveMesh` は構築を失敗させ `Err` を返さなければならない。
+2. 構築時に不変条件（`owner` の長さ == `faces` の長さ、`neighbor` の長さ == `n_internal_faces`、全インデックスが範囲内）が検証される場合、`PrimitiveMesh` は構築を失敗させ `Err` を返さなければならない。
 3. `PrimitiveMesh` が構築された後、基本トポロジデータは変更不可（不変）でなければならない。
 4. 各面の頂点リスト長に制約はなく、任意多角形（三角形・四角形・多角形）を表現できなければならない。
-5. `neighbour` には内部面（`face_index < n_internal_faces`）のみが含まれ、境界面（`face_index >= n_internal_faces`）の隣接セルは存在しない（OpenFOAM 慣行と同等）。
+5. `neighbor` には内部面（`face_index < n_internal_faces`）のみが含まれ、境界面（`face_index >= n_internal_faces`）の隣接セルは存在しない（OpenFOAM 慣行と同等）。
 
 ---
 
@@ -33,7 +33,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 #### 受け入れ基準
 
-1. `PrimitiveMesh` は `cell_centres(&self) -> &[Vector]` メソッドを公開しなければならない。
+1. `PrimitiveMesh` は `cell_centers(&self) -> &[Vector]` メソッドを公開しなければならない。
 2. `PrimitiveMesh` は `cell_volumes(&self) -> &[f64]` メソッドを公開しなければならない。
 3. 各メソッドが初めて呼ばれたとき、`PrimitiveMesh` は点座標・面・所有者から値を計算し内部にキャッシュしなければならない。
 4. 同じメソッドを2回目以降に呼んだとき、`PrimitiveMesh` はキャッシュ済みの値を返し再計算を行ってはならない。
@@ -48,11 +48,11 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 #### 受け入れ基準
 
-1. `PrimitiveMesh` は `face_centres(&self) -> &[Vector]` メソッドを公開しなければならない。
+1. `PrimitiveMesh` は `face_centers(&self) -> &[Vector]` メソッドを公開しなければならない。
 2. `PrimitiveMesh` は `face_areas(&self) -> &[Vector]` メソッドを公開しなければならない（戻り値は面積ベクトル: 法線方向 × 面積スカラー）。
 3. 各メソッドが初めて呼ばれたとき、`PrimitiveMesh` は点座標と面定義から値を計算しキャッシュしなければならない。
 4. 同じメソッドを2回目以降に呼んだとき、`PrimitiveMesh` はキャッシュ済みの値を返し再計算を行ってはならない。
-5. 面積ベクトルは `owner` セルから `neighbour` セルへ向かう向きを正とし、OpenFOAM の慣行と一致しなければならない。
+5. 面積ベクトルは `owner` セルから `neighbor` セルへ向かう向きを正とし、OpenFOAM の慣行と一致しなければならない。
 6. 面積ベクトルのノルム（大きさ）は面の実面積と相対誤差 1e-10 以内で一致しなければならない。
 7. `n_internal_faces` 個の面の面積ベクトルの総和は（閉じた内部ポリトープであれば）ゼロベクトルと絶対誤差 1e-12 以内で一致しなければならない（保存則検証）。
 
@@ -67,7 +67,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 1. `PrimitiveMesh` は `cell_cells(&self) -> &[Vec<usize>]` メソッドを公開しなければならない。
 2. `PrimitiveMesh` は `cell_faces(&self) -> &[Vec<usize>]` メソッドを公開しなければならない。
 3. `PrimitiveMesh` は `cell_points(&self) -> &[Vec<usize>]` メソッドを公開しなければならない。
-4. 各接続情報は初回アクセス時に `owner` および `neighbour` から導出して計算され、以降はキャッシュが返されなければならない。
+4. 各接続情報は初回アクセス時に `owner` および `neighbor` から導出して計算され、以降はキャッシュが返されなければならない。
 5. `cell_faces(c)` が返すリストには、セル `c` が所有者または隣接として関与する全面インデックスが含まれなければならない。
 6. `cell_cells(c)` が返すリストには、`cell_faces(c)` の各内部面を通じて隣接するセルインデックスが含まれなければならない（境界面には隣接セルなし）。
 7. `cell_points(c)` が返すリストには、`cell_faces(c)` に含まれる全面が参照する頂点インデックスが重複なく含まれなければならない。
@@ -82,7 +82,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 1. `PrimitiveMesh` は `Send` および `Sync` を実装しなければならない。
 2. 同一の `PrimitiveMesh` への複数スレッドからの並行不変参照（`&PrimitiveMesh`）は安全でなければならない（データ競合なし）。
-3. 遅延計算フィールド（`cell_centres` 等）の初期化は、並行アクセス下で重複実行が起きず一度だけ実行されなければならない（`OnceCell` の `Sync` 保証を利用）。
+3. 遅延計算フィールド（`cell_centers` 等）の初期化は、並行アクセス下で重複実行が起きず一度だけ実行されなければならない（`OnceCell` の `Sync` 保証を利用）。
 4. `PrimitiveMesh` に `unsafe` コードは含まれてはならない（`OnceCell` 等の安全な抽象を使用）。
 
 ---
@@ -96,7 +96,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 1. `PrimitiveMesh` は `points(&self) -> &[Vector]` メソッドを公開しなければならない。
 2. `PrimitiveMesh` は `faces(&self) -> &[Vec<usize>]` メソッドを公開しなければならない。
 3. `PrimitiveMesh` は `owner(&self) -> &[usize]` メソッドを公開しなければならない。
-4. `PrimitiveMesh` は `neighbour(&self) -> &[usize]` メソッドを公開しなければならない。
+4. `PrimitiveMesh` は `neighbor(&self) -> &[usize]` メソッドを公開しなければならない。
 5. `PrimitiveMesh` は `n_internal_faces(&self) -> usize` メソッドを公開しなければならない。
 6. `PrimitiveMesh` は `n_cells(&self) -> usize` メソッドを公開しなければならない。
 7. `PrimitiveMesh` は `n_faces(&self) -> usize` メソッドを公開しなければならない（= `faces().len()`）。
@@ -112,8 +112,8 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 1. `PrimitiveMesh::new(...)` （またはコンストラクタ相当）は `Result<PrimitiveMesh, MeshError>` を返さなければならない。
 2. `owner` の長さが `faces` の長さと一致しない場合、`PrimitiveMesh` はエラーを返さなければならない。
-3. `neighbour` の長さが `n_internal_faces` と一致しない場合、`PrimitiveMesh` はエラーを返さなければならない。
-4. `owner` または `neighbour` に範囲外のセルインデックスが含まれる場合、`PrimitiveMesh` はエラーを返さなければならない。
+3. `neighbor` の長さが `n_internal_faces` と一致しない場合、`PrimitiveMesh` はエラーを返さなければならない。
+4. `owner` または `neighbor` に範囲外のセルインデックスが含まれる場合、`PrimitiveMesh` はエラーを返さなければならない。
 5. 各面の頂点インデックスに範囲外の点インデックスが含まれる場合、`PrimitiveMesh` はエラーを返さなければならない。
 6. エラー型 `MeshError` は `Debug` および `std::error::Error` を実装し、エラーの原因を示す具体的なメッセージを持たなければならない。
 
@@ -127,7 +127,7 @@ Spec2-1 `mesh-primitive`: トポロジエンジン (`PrimitiveMesh`) の実装
 
 1. `PrimitiveMesh` の単体テストは `crates/mesh/src/` 内の `#[cfg(test)] mod tests` に配置されなければならない。
 2. 単一立方体セル（8点・6面）の `PrimitiveMesh` に対して、`cell_volumes` が正しい体積（例: 1.0 m³）を返すことを検証するテストが存在しなければならない。
-3. 単一立方体セル（8点・6面）の `PrimitiveMesh` に対して、`cell_centres` が正しい中心座標を返すことを検証するテストが存在しなければならない。
+3. 単一立方体セル（8点・6面）の `PrimitiveMesh` に対して、`cell_centers` が正しい中心座標を返すことを検証するテストが存在しなければならない。
 4. 単一立方体セル（8点・6面）の `PrimitiveMesh` に対して、`face_areas` の各面積ベクトルのノルムが正しい面積（例: 1.0 m²）と一致することを検証するテストが存在しなければならない。
 5. 不正なトポロジデータ（インデックス範囲外等）で `PrimitiveMesh::new` を呼んだとき `Err` が返ることを検証するテストが存在しなければならない。
 6. 浮動小数点の比較はすべて許容誤差（tolerance）を明示しなければならない（絶対誤差 または 相対誤差）。

@@ -29,9 +29,9 @@
 | 要件 | 概要 | コンポーネント | インターフェース | フロー |
 |------|------|----------------|-----------------|--------|
 | 1.1–1.5 | 基本トポロジデータの格納と不変条件検証 | `PrimitiveMesh` struct, `MeshError` | `new()` コンストラクタ | 構築時バリデーション |
-| 2.1–2.6 | セルジオメトリの遅延計算 | `PrimitiveMesh`, `geometry` モジュール | `cell_centres()`, `cell_volumes()` | テトラへドロン分解 |
-| 3.1–3.7 | 面ジオメトリの遅延計算 | `PrimitiveMesh`, `geometry` モジュール | `face_centres()`, `face_areas()` | 多角形三角形分割 |
-| 4.1–4.7 | セル接続情報の遅延計算 | `PrimitiveMesh` | `cell_cells()`, `cell_faces()`, `cell_points()` | `owner`/`neighbour` からの導出 |
+| 2.1–2.6 | セルジオメトリの遅延計算 | `PrimitiveMesh`, `geometry` モジュール | `cell_centers()`, `cell_volumes()` | テトラへドロン分解 |
+| 3.1–3.7 | 面ジオメトリの遅延計算 | `PrimitiveMesh`, `geometry` モジュール | `face_centers()`, `face_areas()` | 多角形三角形分割 |
+| 4.1–4.7 | セル接続情報の遅延計算 | `PrimitiveMesh` | `cell_cells()`, `cell_faces()`, `cell_points()` | `owner`/`neighbor` からの導出 |
 | 5.1–5.4 | スレッド安全性 | `PrimitiveMesh` (`OnceLock` フィールド) | — | 同期: `OnceLock::get_or_init` |
 | 6.1–6.8 | 基本トポロジ情報へのアクセサ | `PrimitiveMesh` | `points()`, `faces()`, `owner()` 等 | — |
 | 7.1–7.6 | エラーハンドリングと不変条件検証 | `MeshError` enum | `new()` の `Result` 返却 | 構築時バリデーション |
@@ -93,10 +93,10 @@ graph TB
 graph TD
     A[PrimitiveMesh::new called] --> B{owner.len == faces.len?}
     B -- No --> E1[Err: OwnerLengthMismatch]
-    B -- Yes --> C{neighbour.len == n_internal_faces?}
-    C -- No --> E2[Err: NeighbourLengthMismatch]
-    C -- Yes --> D{全 owner/neighbour インデックス範囲内?}
-    D -- No --> E3[Err: OwnerIndexOutOfRange or NeighbourIndexOutOfRange]
+    B -- Yes --> C{neighbor.len == n_internal_faces?}
+    C -- No --> E2[Err: NeighborLengthMismatch]
+    C -- Yes --> D{全 owner/neighbor インデックス範囲内?}
+    D -- No --> E3[Err: OwnerIndexOutOfRange or NeighborIndexOutOfRange]
     D -- Yes --> F{全面の点インデックス範囲内?}
     F -- No --> E4[Err: PointIndexOutOfRange]
     F -- Yes --> G[Ok: PrimitiveMesh with OnceLock fields unset]
@@ -147,14 +147,14 @@ pub struct PrimitiveMesh {
     points: Vec<Vector>,
     faces: Vec<Vec<usize>>,
     owner: Vec<usize>,
-    neighbour: Vec<usize>,      // len == n_internal_faces
+    neighbor: Vec<usize>,      // len == n_internal_faces
     n_internal_faces: usize,
     n_cells: usize,
 
     // --- 遅延計算ジオメトリ ---
-    cell_centres: std::sync::OnceLock<Vec<Vector>>,
+    cell_centers: std::sync::OnceLock<Vec<Vector>>,
     cell_volumes: std::sync::OnceLock<Vec<f64>>,
-    face_centres: std::sync::OnceLock<Vec<Vector>>,
+    face_centers: std::sync::OnceLock<Vec<Vector>>,
     face_areas:   std::sync::OnceLock<Vec<Vector>>,
 
     // --- 遅延計算接続情報 ---
@@ -169,9 +169,9 @@ pub struct PrimitiveMesh {
 **不変条件（構築時に検証）:**
 
 - `owner.len() == faces.len()`
-- `neighbour.len() == n_internal_faces`
+- `neighbor.len() == n_internal_faces`
 - `owner[i] < n_cells` （全 i）
-- `neighbour[i] < n_cells` （全 i < n_internal_faces）
+- `neighbor[i] < n_cells` （全 i < n_internal_faces）
 - `faces[i][j] < points.len()` （全 i, j）
 
 **依存:**
@@ -188,7 +188,7 @@ impl PrimitiveMesh {
         points: Vec<Vector>,
         faces: Vec<Vec<usize>>,
         owner: Vec<usize>,
-        neighbour: Vec<usize>,
+        neighbor: Vec<usize>,
         n_internal_faces: usize,
         n_cells: usize,
     ) -> Result<Self, MeshError>
@@ -206,7 +206,7 @@ impl PrimitiveMesh {
     pub fn points(&self) -> &[Vector]
     pub fn faces(&self) -> &[Vec<usize>]
     pub fn owner(&self) -> &[usize]
-    pub fn neighbour(&self) -> &[usize]
+    pub fn neighbor(&self) -> &[usize]
     pub fn n_internal_faces(&self) -> usize
     pub fn n_cells(&self) -> usize
     pub fn n_faces(&self) -> usize        // == self.faces.len()
@@ -218,9 +218,9 @@ impl PrimitiveMesh {
 
 ```rust
 impl PrimitiveMesh {
-    pub fn cell_centres(&self) -> &[Vector]
+    pub fn cell_centers(&self) -> &[Vector]
     pub fn cell_volumes(&self) -> &[f64]
-    pub fn face_centres(&self) -> &[Vector]
+    pub fn face_centers(&self) -> &[Vector]
     pub fn face_areas(&self) -> &[Vector]
     pub fn cell_cells(&self) -> &[Vec<usize>]
     pub fn cell_faces(&self) -> &[Vec<usize>]
@@ -232,7 +232,7 @@ impl PrimitiveMesh {
 
 **実装ノート:**
 - 統合: `OnceLock::get_or_init` はブロッキング初期化を保証。複数スレッドが同時に初回アクセスしても計算は一度のみ実行される（要件 5.3 を満たす）
-- リスク: ジオメトリ計算間の依存関係（`cell_volumes` 計算が `face_centres` を内部利用する等）がある場合は、計算順序に注意が必要。本設計では各計算は基本データのみに依存する独立した実装とする
+- リスク: ジオメトリ計算間の依存関係（`cell_volumes` 計算が `face_centers` を内部利用する等）がある場合は、計算順序に注意が必要。本設計では各計算は基本データのみに依存する独立した実装とする
 
 ---
 
@@ -251,10 +251,10 @@ pub enum MeshError {
         expected: usize,  // faces.len()
         got: usize,       // owner.len()
     },
-    #[error("neighbour length mismatch: expected {expected}, got {got}")]
-    NeighbourLengthMismatch {
+    #[error("neighbor length mismatch: expected {expected}, got {got}")]
+    NeighborLengthMismatch {
         expected: usize,  // n_internal_faces
-        got: usize,       // neighbour.len()
+        got: usize,       // neighbor.len()
     },
     #[error("owner index out of range: face {face}, cell {cell}, n_cells {n_cells}")]
     OwnerIndexOutOfRange {
@@ -262,8 +262,8 @@ pub enum MeshError {
         cell: usize,
         n_cells: usize,
     },
-    #[error("neighbour index out of range: face {face}, cell {cell}, n_cells {n_cells}")]
-    NeighbourIndexOutOfRange {
+    #[error("neighbor index out of range: face {face}, cell {cell}, n_cells {n_cells}")]
+    NeighborIndexOutOfRange {
         face: usize,
         cell: usize,
         n_cells: usize,
@@ -298,19 +298,19 @@ pub enum MeshError {
 入力: points（全点座標）, face（面を構成する頂点インデックスリスト）
 ```
 
-**面重心（face centre）の計算手順:**
+**面重心（face center）の計算手順:**
 
 1. 面の各頂点の単純平均を参照点 `p_ref` とする
 2. 面を `p_ref` を頂点とする三角形列に分割する（面の頂点 `v[i]`, `v[(i+1) % n]`, `p_ref`）
-3. 各三角形の重心 `tri_centre = (v[i] + v[i+1] + p_ref) / 3`
+3. 各三角形の重心 `tri_center = (v[i] + v[i+1] + p_ref) / 3`
 4. 各三角形の面積ベクトル `tri_area_vec = 0.5 * (v[i+1] - p_ref) × (v[i] - p_ref)`
-5. 面積加重平均: `face_centre = Σ(tri_centre * |tri_area_vec|) / Σ|tri_area_vec|`
+5. 面積加重平均: `face_center = Σ(tri_center * |tri_area_vec|) / Σ|tri_area_vec|`
 
 **面積ベクトル（face area vector）の計算手順:**
 
 1. 上記の三角形分割を再利用する
 2. 各三角形の面積ベクトルを合計: `face_area_vec = Σ tri_area_vec`
-3. 向き: `owner` セルから `neighbour` セル向きを正とする（OpenFOAM 慣行に準拠）
+3. 向き: `owner` セルから `neighbor` セル向きを正とする（OpenFOAM 慣行に準拠）
 
 **内部関数シグネチャ（例）:**
 
@@ -318,13 +318,13 @@ pub enum MeshError {
 pub(crate) fn compute_face_geometry(
     points: &[Vector],
     face: &[usize],
-) -> (Vector, Vector)  // (face_centre, face_area_vec)
+) -> (Vector, Vector)  // (face_center, face_area_vec)
 ```
 
 ##### セルジオメトリ計算アルゴリズム
 
 ```
-入力: face_centres, face_areas, owner, neighbour, n_internal_faces, n_cells
+入力: face_centers, face_areas, owner, neighbor, n_internal_faces, n_cells
 ```
 
 **セル体積（cell volume）の計算手順（テトラへドロン分解）:**
@@ -332,23 +332,23 @@ pub(crate) fn compute_face_geometry(
 1. 各セルの参照点 `c_ref` として、そのセルに属する全面の面中心の単純平均を使う（初期推定値）
 2. セルの各面について、面中心 `fc` と `c_ref` を底面・頂点とするピラミッドの体積を計算する:
    `pyr_vol = face_area_vec · (fc - c_ref) / 3`
-   （内積の符号は owner/neighbour の向きに応じて調整）
+   （内積の符号は owner/neighbor の向きに応じて調整）
 3. セル体積 = 各ピラミッド体積の合計
 
-**セル中心（cell centre）の計算手順:**
+**セル中心（cell center）の計算手順:**
 
-1. 各ピラミッドの重心 = `pyr_centre = 0.75 * c_ref + 0.25 * fc`
+1. 各ピラミッドの重心 = `pyr_center = 0.75 * c_ref + 0.25 * fc`
    （ピラミッドの頂点 `c_ref` と底面重心 `fc` を 3:1 に内分する点）
-2. 体積加重平均: `cell_centre = Σ(pyr_centre * pyr_vol) / Σpyr_vol`
+2. 体積加重平均: `cell_center = Σ(pyr_center * pyr_vol) / Σpyr_vol`
 
-**実装ノート:** OpenFOAM の `primitiveMeshGeometry.C` における実装と等価なアルゴリズム。面中心と面積ベクトルはセルジオメトリ計算より先に求める必要がある。本設計では `calc_cell_geometry` 内で面ジオメトリを直接計算することで両者を一括して効率よく求める（`face_centres` / `face_areas` の `OnceLock` とは独立したパスで計算し、重複を避けるため計算済みの場合は `get()` を使って再利用する）。
+**実装ノート:** OpenFOAM の `primitiveMeshGeometry.C` における実装と等価なアルゴリズム。面中心と面積ベクトルはセルジオメトリ計算より先に求める必要がある。本設計では `calc_cell_geometry` 内で面ジオメトリを直接計算することで両者を一括して効率よく求める（`face_centers` / `face_areas` の `OnceLock` とは独立したパスで計算し、重複を避けるため計算済みの場合は `get()` を使って再利用する）。
 
 ##### セル接続情報計算アルゴリズム（要件 4）
 
 ```rust
 // 計算ステップ:
-// 1. cell_faces: owner/neighbour を全面で走査し、各セルの面インデックスを収集
-// 2. cell_cells: 内部面のみ対象。owner セルの隣接に neighbour を追加（逆も同様）
+// 1. cell_faces: owner/neighbor を全面で走査し、各セルの面インデックスを収集
+// 2. cell_cells: 内部面のみ対象。owner セルの隣接に neighbor を追加（逆も同様）
 // 3. cell_points: cell_faces の各面が参照する点インデックスを収集し BTreeSet で重複排除
 ```
 
@@ -357,7 +357,7 @@ pub(crate) fn compute_face_geometry(
 ```rust
 pub(crate) fn compute_cell_faces(
     owner: &[usize],
-    neighbour: &[usize],
+    neighbor: &[usize],
     n_internal_faces: usize,
     n_cells: usize,
 ) -> Vec<Vec<usize>>
@@ -365,7 +365,7 @@ pub(crate) fn compute_cell_faces(
 pub(crate) fn compute_cell_cells(
     cell_faces: &[Vec<usize>],
     owner: &[usize],
-    neighbour: &[usize],
+    neighbor: &[usize],
     n_internal_faces: usize,
     n_cells: usize,
 ) -> Vec<Vec<usize>>
@@ -411,7 +411,7 @@ pub use primitive_mesh::PrimitiveMesh;
 ### ドメインモデル
 
 - **集約ルート:** `PrimitiveMesh`（単一）
-- **不変条件:** 「基本データ 4 種（points, faces, owner, neighbour）+ カウンタ 2 種（n_internal_faces, n_cells）から成るトポロジは、構築後に変更されない」
+- **不変条件:** 「基本データ 4 種（points, faces, owner, neighbor）+ カウンタ 2 種（n_internal_faces, n_cells）から成るトポロジは、構築後に変更されない」
 - **遅延値の整合性:** `OnceLock` で保護された 7 フィールドは、基本データが不変である限り常に基本データから導出可能な同一値になる（参照透明性）
 
 ### 物理的データモデル
@@ -421,10 +421,10 @@ pub use primitive_mesh::PrimitiveMesh;
 | `points` | `Vec<Vector>` | ヒープ連続メモリ | `Vector([f64; 3])` — `Copy` 型、24 bytes/要素 |
 | `faces` | `Vec<Vec<usize>>` | 外側 Vec はヒープ連続 | 面ごとに異なる長さを許容（ジャグ配列） |
 | `owner` | `Vec<usize>` | ヒープ連続メモリ | `len == faces.len()` |
-| `neighbour` | `Vec<usize>` | ヒープ連続メモリ | `len == n_internal_faces` |
-| `cell_centres` | `OnceLock<Vec<Vector>>` | ヒープ連続メモリ（初期化後） | `len == n_cells` |
+| `neighbor` | `Vec<usize>` | ヒープ連続メモリ | `len == n_internal_faces` |
+| `cell_centers` | `OnceLock<Vec<Vector>>` | ヒープ連続メモリ（初期化後） | `len == n_cells` |
 | `cell_volumes` | `OnceLock<Vec<f64>>` | ヒープ連続メモリ（初期化後） | `len == n_cells` |
-| `face_centres` | `OnceLock<Vec<Vector>>` | ヒープ連続メモリ（初期化後） | `len == n_faces` |
+| `face_centers` | `OnceLock<Vec<Vector>>` | ヒープ連続メモリ（初期化後） | `len == n_faces` |
 | `face_areas` | `OnceLock<Vec<Vector>>` | ヒープ連続メモリ（初期化後） | `len == n_faces`, 法線方向×面積スカラー |
 | `cell_cells` | `OnceLock<Vec<Vec<usize>>>` | ジャグ配列（初期化後） | セルごとの隣接セルリスト |
 | `cell_faces` | `OnceLock<Vec<Vec<usize>>>` | ジャグ配列（初期化後） | セルごとの所属面リスト |
@@ -443,9 +443,9 @@ pub use primitive_mesh::PrimitiveMesh;
 | エラー種別 | バリアント | 検出タイミング | 対応 |
 |------------|-----------|--------------|------|
 | `owner` 長さ不一致 | `OwnerLengthMismatch` | `new()` 内 | `Err` 返却 |
-| `neighbour` 長さ不一致 | `NeighbourLengthMismatch` | `new()` 内 | `Err` 返却 |
+| `neighbor` 長さ不一致 | `NeighborLengthMismatch` | `new()` 内 | `Err` 返却 |
 | `owner` インデックス範囲外 | `OwnerIndexOutOfRange` | `new()` 内 | `Err` 返却 |
-| `neighbour` インデックス範囲外 | `NeighbourIndexOutOfRange` | `new()` 内 | `Err` 返却 |
+| `neighbor` インデックス範囲外 | `NeighborIndexOutOfRange` | `new()` 内 | `Err` 返却 |
 | 面の点インデックス範囲外 | `PointIndexOutOfRange` | `new()` 内 | `Err` 返却 |
 | 内部不変条件違反 | — | 該当なし（設計上発生不可） | `unreachable!()` |
 
@@ -467,20 +467,20 @@ pub use primitive_mesh::PrimitiveMesh;
 
 - `test_new_valid_single_cube_succeeds` — 単一立方体セル（8点・6面）の正常構築
 - `test_new_owner_length_mismatch_returns_err` — `owner.len() != faces.len()` で `Err` 確認
-- `test_new_neighbour_length_mismatch_returns_err` — `neighbour.len() != n_internal_faces` で `Err` 確認
+- `test_new_neighbor_length_mismatch_returns_err` — `neighbor.len() != n_internal_faces` で `Err` 確認
 - `test_new_owner_index_out_of_range_returns_err` — `owner` に範囲外インデックスで `Err` 確認
 - `test_new_point_index_out_of_range_returns_err` — 面の点インデックスが範囲外で `Err` 確認
 
 **セルジオメトリテスト（要件 2）:**
 
 - `test_cell_volumes_single_cube_returns_one` — 単位立方体のセル体積 == 1.0（相対誤差 1e-10）
-- `test_cell_centres_single_cube_returns_origin` — 単位立方体のセル中心座標（絶対誤差 1e-10）
+- `test_cell_centers_single_cube_returns_origin` — 単位立方体のセル中心座標（絶対誤差 1e-10）
 - `test_cell_volumes_cached_on_second_call` — 2回目の呼び出しで再計算が起きないことを確認（同一ポインタ）
 
 **面ジオメトリテスト（要件 3）:**
 
 - `test_face_areas_single_cube_norm_equals_one` — 単位立方体の各面積ベクトルのノルム == 1.0（相対誤差 1e-10）
-- `test_face_areas_direction_owner_to_neighbour` — 面積ベクトルの向きが owner → neighbour であることを確認
+- `test_face_areas_direction_owner_to_neighbor` — 面積ベクトルの向きが owner → neighbor であることを確認
 - `test_face_areas_sum_zero_for_internal_faces` — 内部面の面積ベクトルの総和がゼロ（絶対誤差 1e-12）
 
 **接続情報テスト（要件 4）:**
@@ -515,8 +515,8 @@ pub use primitive_mesh::PrimitiveMesh;
   f4=[0,4,7,3] (x=-面, owner=0, boundary)
   f5=[1,2,6,5] (x=+面, owner=0, boundary)
 
-owner=[0,0,0,0,0,0], neighbour=[], n_internal_faces=0, n_cells=1
-期待値: cell_volume=1.0, cell_centre=(0.5, 0.5, 0.5)
+owner=[0,0,0,0,0,0], neighbor=[], n_internal_faces=0, n_cells=1
+期待値: cell_volume=1.0, cell_center=(0.5, 0.5, 0.5)
 ```
 
 ---

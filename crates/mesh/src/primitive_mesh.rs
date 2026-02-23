@@ -9,13 +9,13 @@ pub struct PrimitiveMesh {
     points: Vec<Vector>,
     faces: Vec<Vec<usize>>,
     owner: Vec<usize>,
-    neighbour: Vec<usize>,
+    neighbor: Vec<usize>,
     n_internal_faces: usize,
     n_cells: usize,
 
-    cell_centres: OnceLock<Vec<Vector>>,
+    cell_centers: OnceLock<Vec<Vector>>,
     cell_volumes: OnceLock<Vec<f64>>,
-    face_centres: OnceLock<Vec<Vector>>,
+    face_centers: OnceLock<Vec<Vector>>,
     face_areas: OnceLock<Vec<Vector>>,
 
     cell_cells: OnceLock<Vec<Vec<usize>>>,
@@ -28,7 +28,7 @@ impl PrimitiveMesh {
         points: Vec<Vector>,
         faces: Vec<Vec<usize>>,
         owner: Vec<usize>,
-        neighbour: Vec<usize>,
+        neighbor: Vec<usize>,
         n_internal_faces: usize,
         n_cells: usize,
     ) -> Result<Self, MeshError> {
@@ -40,11 +40,11 @@ impl PrimitiveMesh {
             });
         }
 
-        // neighbour length check
-        if neighbour.len() != n_internal_faces {
-            return Err(MeshError::NeighbourLengthMismatch {
+        // neighbor length check
+        if neighbor.len() != n_internal_faces {
+            return Err(MeshError::NeighborLengthMismatch {
                 expected: n_internal_faces,
-                got: neighbour.len(),
+                got: neighbor.len(),
             });
         }
 
@@ -59,10 +59,10 @@ impl PrimitiveMesh {
             }
         }
 
-        // neighbour index range check
-        for (face, &cell) in neighbour.iter().enumerate() {
+        // neighbor index range check
+        for (face, &cell) in neighbor.iter().enumerate() {
             if cell >= n_cells {
-                return Err(MeshError::NeighbourIndexOutOfRange {
+                return Err(MeshError::NeighborIndexOutOfRange {
                     face,
                     cell,
                     n_cells,
@@ -88,12 +88,12 @@ impl PrimitiveMesh {
             points,
             faces,
             owner,
-            neighbour,
+            neighbor,
             n_internal_faces,
             n_cells,
-            cell_centres: OnceLock::new(),
+            cell_centers: OnceLock::new(),
             cell_volumes: OnceLock::new(),
-            face_centres: OnceLock::new(),
+            face_centers: OnceLock::new(),
             face_areas: OnceLock::new(),
             cell_cells: OnceLock::new(),
             cell_faces: OnceLock::new(),
@@ -115,8 +115,8 @@ impl PrimitiveMesh {
         &self.owner
     }
 
-    pub fn neighbour(&self) -> &[usize] {
-        &self.neighbour
+    pub fn neighbor(&self) -> &[usize] {
+        &self.neighbor
     }
 
     pub fn n_internal_faces(&self) -> usize {
@@ -137,26 +137,26 @@ impl PrimitiveMesh {
 
     // Lazy geometry accessors
 
-    /// face_centres と face_areas を一括計算して両方の OnceLock を初期化する。
-    /// 不変条件: このメソッド完了後、face_centres・face_areas の両方が初期化済みである。
+    /// face_centers と face_areas を一括計算して両方の OnceLock を初期化する。
+    /// 不変条件: このメソッド完了後、face_centers・face_areas の両方が初期化済みである。
     fn ensure_face_geometry(&self) {
-        self.face_centres.get_or_init(|| {
-            let mut centres = Vec::with_capacity(self.faces.len());
+        self.face_centers.get_or_init(|| {
+            let mut centers = Vec::with_capacity(self.faces.len());
             let mut areas = Vec::with_capacity(self.faces.len());
             for f in &self.faces {
                 let (fc, fa) = geometry::compute_face_geometry(&self.points, f);
-                centres.push(fc);
+                centers.push(fc);
                 areas.push(fa);
             }
             let _ = self.face_areas.set(areas);
-            centres
+            centers
         });
     }
 
-    pub fn face_centres(&self) -> &[Vector] {
+    pub fn face_centers(&self) -> &[Vector] {
         self.ensure_face_geometry();
         // Safety: ensure_face_geometry() が get_or_init() で初期化済みのため None にならない
-        self.face_centres.get().unwrap()
+        self.face_centers.get().unwrap()
     }
 
     pub fn face_areas(&self) -> &[Vector] {
@@ -165,19 +165,19 @@ impl PrimitiveMesh {
         self.face_areas.get().unwrap()
     }
 
-    /// cell_volumes と cell_centres を一括計算して両方の OnceLock を初期化する。
-    /// 不変条件: このメソッド完了後、cell_volumes・cell_centres の両方が初期化済みである。
+    /// cell_volumes と cell_centers を一括計算して両方の OnceLock を初期化する。
+    /// 不変条件: このメソッド完了後、cell_volumes・cell_centers の両方が初期化済みである。
     fn ensure_cell_geometry(&self) {
         self.cell_volumes.get_or_init(|| {
-            let (volumes, centres) = geometry::compute_cell_geometry(
+            let (volumes, centers) = geometry::compute_cell_geometry(
                 &self.points,
                 &self.faces,
                 &self.owner,
-                &self.neighbour,
+                &self.neighbor,
                 self.n_internal_faces,
                 self.n_cells,
             );
-            let _ = self.cell_centres.set(centres);
+            let _ = self.cell_centers.set(centers);
             volumes
         });
     }
@@ -188,10 +188,10 @@ impl PrimitiveMesh {
         self.cell_volumes.get().unwrap()
     }
 
-    pub fn cell_centres(&self) -> &[Vector] {
+    pub fn cell_centers(&self) -> &[Vector] {
         self.ensure_cell_geometry();
         // Safety: ensure_cell_geometry() が get_or_init() で初期化済みのため None にならない
-        self.cell_centres.get().unwrap()
+        self.cell_centers.get().unwrap()
     }
 
     // Lazy connectivity accessors
@@ -200,7 +200,7 @@ impl PrimitiveMesh {
         self.cell_faces.get_or_init(|| {
             geometry::compute_cell_faces(
                 &self.owner,
-                &self.neighbour,
+                &self.neighbor,
                 self.n_internal_faces,
                 self.n_cells,
             )
@@ -217,7 +217,7 @@ impl PrimitiveMesh {
             geometry::compute_cell_cells(
                 cf,
                 &self.owner,
-                &self.neighbour,
+                &self.neighbor,
                 self.n_internal_faces,
                 self.n_cells,
             )
@@ -256,8 +256,8 @@ mod tests {
             vec![1, 5, 6, 2], // f5: x+ face (outward normal: +x)
         ];
         let owner = vec![0, 0, 0, 0, 0, 0];
-        let neighbour = vec![];
-        PrimitiveMesh::new(points, faces, owner, neighbour, 0, 1).unwrap()
+        let neighbor = vec![];
+        PrimitiveMesh::new(points, faces, owner, neighbor, 0, 1).unwrap()
     }
 
     /// 2セルメッシュ（内部面1つ）
@@ -279,7 +279,7 @@ mod tests {
         ];
         // Internal face first (OpenFOAM convention)
         let faces = vec![
-            vec![1, 5, 6, 2],   // f0: internal face at x=1 (owner=0→neighbour=1, normal +x)
+            vec![1, 5, 6, 2],   // f0: internal face at x=1 (owner=0→neighbor=1, normal +x)
             vec![0, 1, 2, 3],   // f1: cell0 z- boundary (normal -z)
             vec![4, 7, 6, 5],   // f2: cell0 z+ boundary (normal +z)
             vec![0, 4, 5, 1],   // f3: cell0 y- boundary (normal -y)
@@ -292,8 +292,8 @@ mod tests {
             vec![5, 6, 11, 10], // f10: cell1 z+ boundary (normal +z)
         ];
         let owner = vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let neighbour = vec![1]; // face 0 connects cell 0 and cell 1
-        PrimitiveMesh::new(points, faces, owner, neighbour, 1, 2).unwrap()
+        let neighbor = vec![1]; // face 0 connects cell 0 and cell 1
+        PrimitiveMesh::new(points, faces, owner, neighbor, 1, 2).unwrap()
     }
 
     // ===== Task 7.1: Test helpers =====
@@ -325,14 +325,14 @@ mod tests {
     }
 
     #[test]
-    fn test_new_neighbour_length_mismatch_returns_err() {
+    fn test_new_neighbor_length_mismatch_returns_err() {
         let points = vec![Vector::zero(); 4];
         let faces = vec![vec![0, 1, 2]];
         let owner = vec![0];
-        let result = PrimitiveMesh::new(points, faces, owner, vec![0], 0, 1); // neighbour len=1 but n_internal=0
+        let result = PrimitiveMesh::new(points, faces, owner, vec![0], 0, 1); // neighbor len=1 but n_internal=0
         assert!(matches!(
             result,
-            Err(MeshError::NeighbourLengthMismatch { .. })
+            Err(MeshError::NeighborLengthMismatch { .. })
         ));
     }
 
@@ -349,15 +349,15 @@ mod tests {
     }
 
     #[test]
-    fn test_new_neighbour_index_out_of_range_returns_err() {
+    fn test_new_neighbor_index_out_of_range_returns_err() {
         let points = vec![Vector::zero(); 4];
         let faces = vec![vec![0, 1, 2], vec![1, 2, 3]];
         let owner = vec![0, 1];
-        let neighbour = vec![5]; // out of range
-        let result = PrimitiveMesh::new(points, faces, owner, neighbour, 1, 2);
+        let neighbor = vec![5]; // out of range
+        let result = PrimitiveMesh::new(points, faces, owner, neighbor, 1, 2);
         assert!(matches!(
             result,
-            Err(MeshError::NeighbourIndexOutOfRange { .. })
+            Err(MeshError::NeighborIndexOutOfRange { .. })
         ));
     }
 
@@ -395,18 +395,18 @@ mod tests {
     }
 
     #[test]
-    fn test_cell_centres_single_cube_returns_half() {
+    fn test_cell_centers_single_cube_returns_half() {
         let mesh = make_unit_cube_mesh();
-        let centres = mesh.cell_centres();
-        assert_eq!(centres.len(), 1);
+        let centers = mesh.cell_centers();
+        assert_eq!(centers.len(), 1);
         let expected = Vector::new(0.5, 0.5, 0.5);
-        let diff = (centres[0] - expected).mag();
+        let diff = (centers[0] - expected).mag();
         assert!(
             diff < 1e-10,
-            "cell centre error {diff} >= 1e-10, got ({}, {}, {})",
-            centres[0].x(),
-            centres[0].y(),
-            centres[0].z()
+            "cell center error {diff} >= 1e-10, got ({}, {}, {})",
+            centers[0].x(),
+            centers[0].y(),
+            centers[0].z()
         );
     }
 
@@ -506,13 +506,13 @@ mod tests {
     }
 
     #[test]
-    fn test_two_cell_centres() {
+    fn test_two_cell_centers() {
         let mesh = make_two_cell_mesh();
-        let centres = mesh.cell_centres();
+        let centers = mesh.cell_centers();
         let expected = [Vector::new(0.5, 0.5, 0.5), Vector::new(1.5, 0.5, 0.5)];
-        for (i, (c, e)) in centres.iter().zip(expected.iter()).enumerate() {
+        for (i, (c, e)) in centers.iter().zip(expected.iter()).enumerate() {
             let diff = (*c - *e).mag();
-            assert!(diff < 1e-10, "cell {i} centre error {diff}");
+            assert!(diff < 1e-10, "cell {i} center error {diff}");
         }
     }
 }
