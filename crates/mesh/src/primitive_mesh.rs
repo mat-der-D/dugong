@@ -137,6 +137,8 @@ impl PrimitiveMesh {
 
     // Lazy geometry accessors
 
+    /// face_centres と face_areas を一括計算して両方の OnceLock を初期化する。
+    /// 不変条件: このメソッド完了後、face_centres・face_areas の両方が初期化済みである。
     fn ensure_face_geometry(&self) {
         self.face_centres.get_or_init(|| {
             let mut centres = Vec::with_capacity(self.faces.len());
@@ -146,29 +148,25 @@ impl PrimitiveMesh {
                 centres.push(fc);
                 areas.push(fa);
             }
-            // Initialize face_areas too
             let _ = self.face_areas.set(areas);
             centres
-        });
-        // If face_areas wasn't set (race condition won't happen with OnceLock, but be safe)
-        self.face_areas.get_or_init(|| {
-            self.faces
-                .iter()
-                .map(|f| geometry::compute_face_geometry(&self.points, f).1)
-                .collect()
         });
     }
 
     pub fn face_centres(&self) -> &[Vector] {
         self.ensure_face_geometry();
+        // Safety: ensure_face_geometry() が get_or_init() で初期化済みのため None にならない
         self.face_centres.get().unwrap()
     }
 
     pub fn face_areas(&self) -> &[Vector] {
         self.ensure_face_geometry();
+        // Safety: ensure_face_geometry() が get_or_init() で初期化済みのため None にならない
         self.face_areas.get().unwrap()
     }
 
+    /// cell_volumes と cell_centres を一括計算して両方の OnceLock を初期化する。
+    /// 不変条件: このメソッド完了後、cell_volumes・cell_centres の両方が初期化済みである。
     fn ensure_cell_geometry(&self) {
         self.cell_volumes.get_or_init(|| {
             let (volumes, centres) = geometry::compute_cell_geometry(
@@ -182,26 +180,17 @@ impl PrimitiveMesh {
             let _ = self.cell_centres.set(centres);
             volumes
         });
-        self.cell_centres.get_or_init(|| {
-            let (_, centres) = geometry::compute_cell_geometry(
-                &self.points,
-                &self.faces,
-                &self.owner,
-                &self.neighbour,
-                self.n_internal_faces,
-                self.n_cells,
-            );
-            centres
-        });
     }
 
     pub fn cell_volumes(&self) -> &[f64] {
         self.ensure_cell_geometry();
+        // Safety: ensure_cell_geometry() が get_or_init() で初期化済みのため None にならない
         self.cell_volumes.get().unwrap()
     }
 
     pub fn cell_centres(&self) -> &[Vector] {
         self.ensure_cell_geometry();
+        // Safety: ensure_cell_geometry() が get_or_init() で初期化済みのため None にならない
         self.cell_centres.get().unwrap()
     }
 
