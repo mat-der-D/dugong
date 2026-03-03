@@ -74,6 +74,7 @@ impl PolyMesh {
 
         // Validate face range coverage
         if !patch_specs.is_empty() {
+            // Safety: is_empty() check above guarantees first()/last() return Some.
             let first = patch_specs.first().unwrap();
             let last = patch_specs.last().unwrap();
             let patch_start = first.start();
