@@ -5,6 +5,27 @@ use dugong_types::tensor::Vector;
 use crate::error::MeshError;
 use crate::geometry;
 
+/// The topology engine for polyhedral meshes.
+///
+/// Stores the minimal set of mesh data — point coordinates, face-vertex
+/// connectivity, and owner/neighbor cell indices — and lazily derives
+/// geometry (cell volumes, cell centers, face area vectors, face centers)
+/// and connectivity (cell-cells, cell-faces, cell-points) on first access.
+///
+/// # Mesh topology conventions (OpenFOAM-compatible)
+///
+/// Faces are divided into two groups, stored contiguously in `faces`:
+///
+/// - **Internal faces** (`faces[0..n_internal_faces()]`): shared by two cells.
+///   Each has an entry in both `owner` and `neighbor`.
+/// - **Boundary faces** (`faces[n_internal_faces()..n_faces()]`): on the mesh
+///   boundary with only one adjacent cell. Each has an entry in `owner` only.
+///
+/// The `neighbor` slice contains exactly one entry per internal face, so
+/// `neighbor.len()` defines the number of internal faces.
+///
+/// All data is immutable after construction. Lazy fields use [`OnceLock`] so
+/// the struct is `Send + Sync` without `unsafe`.
 pub struct PrimitiveMesh {
     points: Vec<Vector>,
     faces: Vec<Vec<usize>>,
@@ -23,6 +44,25 @@ pub struct PrimitiveMesh {
 }
 
 impl PrimitiveMesh {
+    /// Constructs a new `PrimitiveMesh` after validating all topology invariants.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` — Vertex coordinates.
+    /// * `faces` — Each face is a list of point indices defining a polygon.
+    ///   Internal faces must come first, followed by boundary faces.
+    /// * `owner` — The owner cell index for each face. `owner.len()` must equal
+    ///   `faces.len()`.
+    /// * `neighbor` — The neighbor cell index for each internal face.
+    ///   `neighbor.len()` implicitly defines the number of internal faces.
+    /// * `n_cells` — Total number of cells.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if any invariant is violated:
+    /// - `owner.len() != faces.len()`
+    /// - Any `owner` or `neighbor` index `>= n_cells`
+    /// - Any point index in `faces` `>= points.len()`
     pub fn new(
         points: Vec<Vector>,
         faces: Vec<Vec<usize>>,
@@ -92,46 +132,67 @@ impl PrimitiveMesh {
 
     // Basic accessors
 
+    /// Returns the vertex coordinates.
     pub fn points(&self) -> &[Vector] {
         &self.points
     }
 
+    /// Returns the face definitions. Each face is a list of point indices
+    /// forming a polygon. Internal faces occupy `faces[0..n_internal_faces()]`,
+    /// boundary faces occupy the remainder.
     pub fn faces(&self) -> &[Vec<usize>] {
         &self.faces
     }
 
+    /// Returns the owner cell index for each face.
+    ///
+    /// Every face has exactly one owner cell. The area vector of a face points
+    /// outward from its owner cell.
     pub fn owner(&self) -> &[usize] {
         &self.owner
     }
 
+    /// Returns the neighbor cell index for each internal face.
+    ///
+    /// Only internal faces (those shared by two cells) have a neighbor.
+    /// `neighbor[i]` is the cell on the opposite side of `faces[i]` from
+    /// `owner[i]`. Boundary faces have no entry in this slice.
     pub fn neighbor(&self) -> &[usize] {
         &self.neighbor
     }
 
+    /// Returns the number of internal faces.
+    ///
+    /// Internal faces are shared by two cells and appear at the beginning
+    /// of the face list (`faces[0..n_internal_faces()]`). The remaining faces
+    /// are boundary faces. Equal to `neighbor().len()`.
     pub fn n_internal_faces(&self) -> usize {
         self.neighbor.len()
     }
 
+    /// Returns the total number of cells.
     pub fn n_cells(&self) -> usize {
         self.n_cells
     }
 
+    /// Returns the total number of faces (internal + boundary).
     pub fn n_faces(&self) -> usize {
         self.faces.len()
     }
 
+    /// Returns the total number of points (vertices).
     pub fn n_points(&self) -> usize {
         self.points.len()
     }
 
     // Lazy geometry accessors
 
-    /// face_centers と face_areas を一括計算して両方の OnceLock を初期化する。
-    /// 不変条件: このメソッド完了後、face_centers・face_areas の両方が初期化済みである。
+    /// Computes and caches both face centers and face area vectors.
     ///
-    /// # Safety (論理的前提条件)
+    /// # Safety (logical preconditions)
     ///
-    /// `new()` で faces 内の全頂点インデックスが points の範囲内であることを検証済み。
+    /// All point indices in `faces` have been validated to be within
+    /// `points` bounds by `new()`.
     fn ensure_face_geometry(&self) {
         self.face_centers.get_or_init(|| {
             let mut centers = Vec::with_capacity(self.faces.len());
@@ -146,27 +207,34 @@ impl PrimitiveMesh {
         });
     }
 
+    /// Returns the centroid of each face. Lazily computed on first access.
+    ///
+    /// The returned slice has length `n_faces()`.
     pub fn face_centers(&self) -> &[Vector] {
         self.ensure_face_geometry();
-        // Safety: ensure_face_geometry() が get_or_init() で初期化済みのため None にならない
+        // Safety: ensure_face_geometry() initializes face_centers via get_or_init(), so it is never None.
         self.face_centers.get().unwrap()
     }
 
+    /// Returns the area vector of each face. Lazily computed on first access.
+    ///
+    /// Each area vector's direction is the outward normal of the face relative
+    /// to its owner cell, and its magnitude equals the face area.
+    /// The returned slice has length `n_faces()`.
     pub fn face_areas(&self) -> &[Vector] {
         self.ensure_face_geometry();
-        // Safety: ensure_face_geometry() が get_or_init() で初期化済みのため None にならない
+        // Safety: ensure_face_geometry() sets face_areas as a side effect and guarantees it is initialized.
         self.face_areas.get().unwrap()
     }
 
-    /// cell_volumes と cell_centers を一括計算して両方の OnceLock を初期化する。
-    /// 不変条件: このメソッド完了後、cell_volumes・cell_centers の両方が初期化済みである。
+    /// Computes and caches both cell volumes and cell centers.
     ///
-    /// # Safety (論理的前提条件)
+    /// # Safety (logical preconditions)
     ///
-    /// `new()` で以下を検証済み:
-    /// - faces 内の全頂点インデックスが points の範囲内
-    /// - owner の各要素が n_cells 未満
-    /// - neighbor の各要素が n_cells 未満
+    /// Validated by `new()`:
+    /// - All point indices in `faces` are within `points` bounds.
+    /// - All `owner` elements are less than `n_cells`.
+    /// - All `neighbor` elements are less than `n_cells`.
     fn ensure_cell_geometry(&self) {
         self.cell_volumes.get_or_init(|| {
             let (volumes, centers) = geometry::compute_cell_geometry(
@@ -181,39 +249,62 @@ impl PrimitiveMesh {
         });
     }
 
+    /// Returns the volume of each cell. Lazily computed on first access.
+    ///
+    /// Computed via tetrahedral (pyramid) decomposition of each cell.
+    /// The returned slice has length `n_cells()`.
     pub fn cell_volumes(&self) -> &[f64] {
         self.ensure_cell_geometry();
-        // Safety: ensure_cell_geometry() が get_or_init() で初期化済みのため None にならない
+        // Safety: ensure_cell_geometry() initializes cell_volumes via get_or_init(), so it is never None.
         self.cell_volumes.get().unwrap()
     }
 
+    /// Returns the centroid of each cell. Lazily computed on first access.
+    ///
+    /// Computed as the volume-weighted average of pyramid centroids.
+    /// The returned slice has length `n_cells()`.
     pub fn cell_centers(&self) -> &[Vector] {
         self.ensure_cell_geometry();
-        // Safety: ensure_cell_geometry() が get_or_init() で初期化済みのため None にならない
+        // Safety: ensure_cell_geometry() sets cell_centers as a side effect and guarantees it is initialized.
         self.cell_centers.get().unwrap()
     }
 
     // Lazy connectivity accessors
 
-    /// # Safety (論理的前提条件)
+    /// Computes and caches the cell-to-face connectivity.
     ///
-    /// `new()` で以下を検証済み:
-    /// - owner の各要素が n_cells 未満
-    /// - neighbor の各要素が n_cells 未満
+    /// # Safety (logical preconditions)
+    ///
+    /// Validated by `new()`:
+    /// - All `owner` elements are less than `n_cells`.
+    /// - All `neighbor` elements are less than `n_cells`.
     fn ensure_cell_faces(&self) -> &[Vec<usize>] {
         self.cell_faces
             .get_or_init(|| geometry::compute_cell_faces(&self.owner, &self.neighbor, self.n_cells))
     }
 
+    /// Returns the face indices adjacent to each cell. Lazily computed on
+    /// first access.
+    ///
+    /// `cell_faces()[c]` contains the indices (into `faces()`) of all faces
+    /// that border cell `c`, including both internal and boundary faces.
+    /// The returned slice has length `n_cells()`.
     pub fn cell_faces(&self) -> &[Vec<usize>] {
         self.ensure_cell_faces()
     }
 
-    /// # Safety (論理的前提条件)
+    /// Returns the neighboring cell indices for each cell. Lazily computed on
+    /// first access.
     ///
-    /// `new()` で以下を検証済み:
-    /// - owner の各要素が n_cells 未満
-    /// - neighbor の各要素が n_cells 未満
+    /// `cell_cells()[c]` contains the indices of all cells that share an
+    /// internal face with cell `c`. Boundary faces do not contribute neighbors.
+    /// The returned slice has length `n_cells()`.
+    ///
+    /// # Safety (logical preconditions)
+    ///
+    /// Validated by `new()`:
+    /// - All `owner` elements are less than `n_cells`.
+    /// - All `neighbor` elements are less than `n_cells`.
     pub fn cell_cells(&self) -> &[Vec<usize>] {
         self.cell_cells.get_or_init(|| {
             let cf = self.ensure_cell_faces();
@@ -221,12 +312,20 @@ impl PrimitiveMesh {
         })
     }
 
-    /// # Safety (論理的前提条件)
+    /// Returns the point indices belonging to each cell. Lazily computed on
+    /// first access.
     ///
-    /// `new()` で以下を検証済み:
-    /// - owner の各要素が n_cells 未満 (ensure_cell_faces の前提条件)
-    /// - neighbor の各要素が n_cells 未満 (ensure_cell_faces の前提条件)
-    /// - cell_faces が返す面インデックスは owner/neighbor 由来のため faces の範囲内
+    /// `cell_points()[c]` contains all vertex indices that form cell `c`,
+    /// collected from its adjacent faces with duplicates removed and sorted
+    /// in ascending order. The returned slice has length `n_cells()`.
+    ///
+    /// # Safety (logical preconditions)
+    ///
+    /// Validated by `new()`:
+    /// - All `owner` elements are less than `n_cells` (for `ensure_cell_faces`).
+    /// - All `neighbor` elements are less than `n_cells` (for `ensure_cell_faces`).
+    /// - Face indices returned by `cell_faces` are derived from `owner`/`neighbor`
+    ///   and therefore within `faces` bounds.
     pub fn cell_points(&self) -> &[Vec<usize>] {
         self.cell_points.get_or_init(|| {
             let cf = self.ensure_cell_faces();
