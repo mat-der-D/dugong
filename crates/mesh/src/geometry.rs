@@ -65,8 +65,6 @@ pub(crate) fn compute_cell_geometry(
     neighbor: &[usize],
     n_cells: usize,
 ) -> (Vec<f64>, Vec<Vector>) {
-    let n_internal_faces = neighbor.len();
-
     // Compute geometry for all faces up front
     let face_geom: Vec<(Vector, Vector)> = faces
         .iter()
@@ -104,8 +102,7 @@ pub(crate) fn compute_cell_geometry(
     }
 
     // Neighbor-side contribution (area vector is reversed for the neighbor cell)
-    for fi in 0..n_internal_faces {
-        let n = neighbor[fi];
+    for (fi, &n) in neighbor.iter().enumerate() {
         let (fc, fa) = face_geom[fi];
         let pyr_vol = (-fa) * (fc - c_ref[n]) / 3.0;
         let pyr_center = c_ref[n] * 0.75 + fc * 0.25;
@@ -183,10 +180,9 @@ pub(crate) fn compute_cell_cells(
 pub(crate) fn compute_cell_points(
     cell_faces: &[Vec<usize>],
     faces: &[Vec<usize>],
-    n_cells: usize,
 ) -> Vec<Vec<usize>> {
-    let mut result = Vec::with_capacity(n_cells);
-    for cell_face_indices in cell_faces.iter().take(n_cells) {
+    let mut result = Vec::with_capacity(cell_faces.len());
+    for cell_face_indices in cell_faces {
         let mut pts = BTreeSet::new();
         for &fi in cell_face_indices {
             for &pi in &faces[fi] {
@@ -418,7 +414,7 @@ mod tests {
     fn cell_points_single_cube() {
         let faces = cube_faces();
         let cf = vec![vec![0, 1, 2, 3, 4, 5]];
-        let cp = compute_cell_points(&cf, &faces, 1);
+        let cp = compute_cell_points(&cf, &faces);
         assert_eq!(cp.len(), 1);
         assert_eq!(cp[0], vec![0, 1, 2, 3, 4, 5, 6, 7]);
     }
@@ -427,7 +423,7 @@ mod tests {
     fn cell_points_no_duplicates() {
         let faces = cube_faces();
         let cf = vec![vec![0, 1, 2, 3, 4, 5]];
-        let cp = compute_cell_points(&cf, &faces, 1);
+        let cp = compute_cell_points(&cf, &faces);
         let mut sorted = cp[0].clone();
         sorted.sort();
         sorted.dedup();
@@ -439,7 +435,7 @@ mod tests {
         // BTreeSet guarantees sorted output
         let faces = cube_faces();
         let cf = vec![vec![0, 1, 2, 3, 4, 5]];
-        let cp = compute_cell_points(&cf, &faces, 1);
+        let cp = compute_cell_points(&cf, &faces);
         let mut sorted = cp[0].clone();
         sorted.sort();
         assert_eq!(cp[0], sorted);

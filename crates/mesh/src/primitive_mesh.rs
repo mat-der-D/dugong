@@ -322,7 +322,7 @@ impl PrimitiveMesh {
     pub fn cell_points(&self) -> &[Vec<usize>] {
         self.cell_points.get_or_init(|| {
             let cf = self.ensure_cell_faces();
-            geometry::compute_cell_points(cf, &self.faces, self.n_cells)
+            geometry::compute_cell_points(cf, &self.faces)
         })
     }
 }
@@ -330,7 +330,7 @@ impl PrimitiveMesh {
 #[cfg(test)]
 mod tests {
     use super::*;
-    /// 単一立方体セル（8点・6面・n_internal_faces=0・n_cells=1）
+    /// Single unit-cube cell (8 points, 6 faces, 0 internal faces, 1 cell).
     fn make_unit_cube_mesh() -> PrimitiveMesh {
         let points = vec![
             Vector::new(0.0, 0.0, 0.0), // 0
@@ -355,8 +355,8 @@ mod tests {
         PrimitiveMesh::new(points, faces, owner, neighbor).unwrap()
     }
 
-    /// 2セルメッシュ（内部面1つ）
-    /// セル0: x=0..1, セル1: x=1..2, 共有面: x=1
+    /// Two-cell mesh with one internal face.
+    /// Cell 0: x=0..1, Cell 1: x=1..2, shared face at x=1.
     fn make_two_cell_mesh() -> PrimitiveMesh {
         let points = vec![
             Vector::new(0.0, 0.0, 0.0), // 0
