@@ -15,10 +15,14 @@ PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法
 #### Acceptance Criteria
 
 1. The dugong-mesh shall `PolyPatch` trait を公開し、パッチ名・開始面インデックス・サイズ・パッチ種別の取得メソッドを提供する
-2. The dugong-mesh shall `PolyPatch` trait にオプショナルな `as_coupled()` メソッドを提供し、結合パッチへのダウンキャストを可能にする（デフォルト実装は `None` を返す）
-3. The dugong-mesh shall `CoupledPatch` trait を `PolyPatch` のサブ trait として公開し、隣接セル情報・隣接セル中心・隣接ランク番号・変換情報へのアクセスメソッドを提供する
-4. The dugong-mesh shall `PolyPatch` trait をオブジェクト安全にし、`Box<dyn PolyPatch>` として使用可能にする
-5. The dugong-mesh shall `CoupledPatch` trait をオブジェクト安全にし、`&dyn CoupledPatch` として使用可能にする
+2. The dugong-mesh shall `PolyPatch` trait に `Send + Sync` bounds を要求する
+3. The dugong-mesh shall `PolyPatch` trait にオプショナルな `as_coupled()` メソッド（不変参照）を提供し、結合パッチへのダウンキャストを可能にする（デフォルト実装は `None` を返す）
+4. The dugong-mesh shall `PolyPatch` trait にオプショナルな `as_coupled_mut()` メソッド（可変参照）を提供し、結合パッチへの可変ダウンキャストを可能にする（デフォルト実装は `None` を返す）
+5. The dugong-mesh shall `PolyPatch` trait にデフォルト実装の `move_points()` フックメソッドを提供し、メッシュ点移動時にパッチ種別ごとの更新処理を可能にする（デフォルトは何もしない）
+6. The dugong-mesh shall `CoupledPatch` trait を `PolyPatch` のサブ trait として公開し、隣接セル情報・隣接セル中心・隣接ランク番号・変換情報へのアクセスメソッドを提供する
+7. The dugong-mesh shall `CoupledPatch` trait の `neighbor_rank()` メソッドが `Option<i32>` を返し、`ProcessorPolyPatch` は `Some(rank)` を、`CyclicPolyPatch` は `None` を返す
+8. The dugong-mesh shall `PolyPatch` trait をオブジェクト安全にし、`Box<dyn PolyPatch>` として使用可能にする
+9. The dugong-mesh shall `CoupledPatch` trait をオブジェクト安全にし、`&dyn CoupledPatch` および `&mut dyn CoupledPatch` として使用可能にする
 
 ### Requirement 2: パッチ具象型
 
@@ -52,9 +56,8 @@ PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法
 
 #### Acceptance Criteria
 
-1. The dugong-mesh shall `ProcessorPolyPatch` に隣接ランク番号へのアクセスメソッドを提供する
-2. The dugong-mesh shall `ProcessorPolyPatch` に隣接セル中心の設定・取得メソッドを提供する
-3. The dugong-mesh shall `ProcessorPolyPatch` に face-cell マッピングへのアクセスメソッドを提供する
+1. The dugong-mesh shall `ProcessorPolyPatch` に隣接セル中心の設定・取得メソッドを提供する
+2. The dugong-mesh shall `ProcessorPolyPatch` に face-cell マッピングへのアクセスメソッドを提供する
 
 ### Requirement 5: ゾーン型
 
@@ -65,7 +68,7 @@ PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法
 1. The dugong-mesh shall `Zone` 型を提供し、名前とインデックスリストを保持する（cellZone / pointZone 共用）
 2. The dugong-mesh shall `FaceZone` 型を提供し、名前・インデックスリスト・flip map を保持する
 3. The dugong-mesh shall ゾーンの名前によるアクセスメソッドを提供する
-4. The dugong-mesh shall ゾーンのインデックスリストへのアクセスメソッドを提供する
+4. The dugong-mesh shall `Zone` および `FaceZone` のインデックスリストへのアクセスメソッドを提供する
 5. The dugong-mesh shall `FaceZone` の flip map へのアクセスメソッドを提供する
 
 ### Requirement 6: GlobalMeshData（並列トポロジ情報）
@@ -86,7 +89,7 @@ PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法
 1. The dugong-mesh shall `PolyMesh` 構造体を提供し、`PrimitiveMesh`・パッチリスト・ゾーンリスト・旧時刻点情報・グローバルデータを保持する
 2. The dugong-mesh shall `PolyMesh` から `PrimitiveMesh` の全アクセサへの委譲メソッドを提供する（`points()`, `faces()`, `owner()`, `neighbor()`, `n_internal_faces()`, `n_cells()`, `n_faces()`, `n_points()`, `cell_volumes()`, `cell_centers()`, `face_centers()`, `face_areas()`, `cell_cells()`, `cell_faces()`, `cell_points()`）
 3. The dugong-mesh shall `PolyMesh` からパッチリストへのアクセスメソッドを提供する
-4. The dugong-mesh shall `PolyMesh` から各種ゾーンリストへのアクセスメソッドを提供する
+4. The dugong-mesh shall `PolyMesh` から `cell_zones`・`face_zones`・`point_zones` の3つの独立したゾーンリストへのアクセスメソッドを提供する
 5. The dugong-mesh shall `PolyMesh` から `GlobalMeshData` へのアクセスメソッドを提供する（`Option` 型、シリアル時は `None`）
 6. The dugong-mesh shall `PolyMesh` から旧時刻点座標へのアクセスメソッドを提供する（`Option` 型、非動的メッシュ時は `None`）
 7. The dugong-mesh shall `PolyMesh` が `Send + Sync` であることを保証する
