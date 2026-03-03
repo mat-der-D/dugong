@@ -6,6 +6,11 @@
 
 PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法メッシュに必要なパッチ分類と接続情報を提供する。
 
+### スコープ外の明示事項
+
+- **動的メッシュでの隣接セル中心の再交換**: 本スペックでは結合パッチの `neighbor_cell_centers` を構築時に確定し不変とする。動的メッシュの `move_points` で隣接セル中心を再交換する機構（`CoupledPatch` への更新メソッド追加、またはパッチ再構築）は Spec 2-3（FvMesh）で設計する。本スペックの `move_points()` フック（Req 1.5）と `face_cells()` メソッド（Req 1.6）が拡張ポイントとして機能する。
+- **GlobalMeshData の共有点情報**: `shared_point_labels` / `shared_point_addressing` 等のプロセッサ間共有点トポロジ情報は本スペックではスコープ外とする。必要に応じて後続スペックで `GlobalMeshData` を拡張する。
+
 ## Requirements
 
 ### Requirement 1: PolyPatch trait 階層
@@ -19,7 +24,7 @@ PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法
 3. The dugong-mesh shall `PolyPatch` trait にオプショナルな `as_coupled()` メソッド（不変参照）を提供し、結合パッチへのダウンキャストを可能にする（デフォルト実装は `None` を返す）
 4. The dugong-mesh shall `PolyPatch` trait にオプショナルな `as_coupled_mut()` メソッド（可変参照）を提供し、結合パッチへの可変ダウンキャストを可能にする（デフォルト実装は `None` を返す）
 5. The dugong-mesh shall `PolyPatch` trait にデフォルト実装の `move_points()` フックメソッドを提供し、メッシュ点移動時にパッチ種別ごとの更新処理を可能にする（デフォルトは何もしない）
-6. The dugong-mesh shall `CoupledPatch` trait を `PolyPatch` のサブ trait として公開し、隣接セル情報・隣接セル中心・隣接ランク番号・変換情報へのアクセスメソッドを提供する
+6. The dugong-mesh shall `CoupledPatch` trait を `PolyPatch` のサブ trait として公開し、face-cell マッピング・隣接セル中心・隣接ランク番号・変換情報へのアクセスメソッドを提供する
 7. The dugong-mesh shall `CoupledPatch` trait の `neighbor_rank()` メソッドが `Option<i32>` を返し、`ProcessorPolyPatch` は `Some(rank)` を、`CyclicPolyPatch` は `None` を返す
 8. The dugong-mesh shall `PolyPatch` trait をオブジェクト安全にし、`Box<dyn PolyPatch>` として使用可能にする
 9. The dugong-mesh shall `CoupledPatch` trait をオブジェクト安全にし、`&dyn CoupledPatch` および `&mut dyn CoupledPatch` として使用可能にする
@@ -49,6 +54,7 @@ PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法
 1. The dugong-mesh shall `Transform` 型を提供し、周期パッチの幾何的変換（並進ベクトルまたは回転パラメータ）を表現する
 2. The dugong-mesh shall `CyclicPolyPatch` に変換情報へのアクセスメソッドを提供する
 3. The dugong-mesh shall `CyclicPolyPatch` に隣接セル中心の取得メソッドを提供する（隣接セル中心は構築時にコンストラクタ引数として渡される）
+4. The dugong-mesh shall `CyclicPolyPatch` に face-cell マッピングの取得メソッドを提供する
 
 ### Requirement 4: ProcessorPolyPatch の並列情報
 
@@ -100,7 +106,7 @@ PolyMesh は後続の `FvMesh`（Spec 2-3）の基盤となり、有限体積法
 
 #### Acceptance Criteria
 
-1. The dugong-mesh shall `PatchSpec` enum を提供し、各パッチ種別の構築に必要なパラメータを値型として保持する（面範囲・パッチ名・種別固有パラメータ）
+1. The dugong-mesh shall `PatchSpec` enum を提供し、各パッチ種別の構築に必要なパラメータを値型として保持する（面範囲・パッチ名・種別固有パラメータ。結合パッチは face-cell マッピングを含む）
 2. The dugong-mesh shall `PolyMesh` のコンストラクタを提供し、`PrimitiveMesh`・パッチ仕様リスト（`Vec<PatchSpec>`）・結合パッチの隣接セル中心マップ・ゾーンリストを受け取る
 3. The dugong-mesh shall `PolyMesh` コンストラクタ内で `PatchSpec` から具象パッチ型（`Box<dyn PolyPatch>`）を生成し、結合パッチには隣接セル中心マップから対応データを注入する
 4. When パッチの面範囲が `PrimitiveMesh` の境界面範囲と整合しないとき, the dugong-mesh shall エラーを返す

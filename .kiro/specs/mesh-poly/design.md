@@ -20,7 +20,8 @@
 - メッシュファイルの I/O（別スペックで対応）
 - `FvMesh`（Spec 2-3）の実装
 - MPI 通信の実装（パッチは通信に必要な情報を保持するが、通信自体は行わない）
-- 動的メッシュの変形ロジック（`move_points()` フックのみ提供）
+- 動的メッシュの変形ロジック（`move_points()` フックのみ提供）。動的メッシュでの `neighbor_cell_centers` 再交換機構（`CoupledPatch` への更新メソッド追加、またはパッチ再構築）は Spec 2-3 で設計する。本スペックの `move_points()` フックと `CoupledPatch::face_cells()` が拡張ポイントとして機能する
+- `GlobalMeshData` の共有点情報（`shared_point_labels` / `shared_point_addressing`）。必要に応じて後続スペックで拡張する
 
 ## アーキテクチャ
 
@@ -223,7 +224,7 @@ pub trait PolyPatch: Send + Sync {
 | 要件 | 1.6, 1.7, 1.9 |
 
 **責務 & 制約**
-- 隣接セル情報・隣接セル中心・隣接ランク番号・変換情報へのアクセスを提供
+- face-cell マッピング・隣接セル中心・隣接ランク番号・変換情報へのアクセスを提供
 - `PolyPatch` のスーパー trait として定義
 - オブジェクト安全であり、`&dyn CoupledPatch` / `&mut dyn CoupledPatch` として使用可能
 
@@ -240,6 +241,10 @@ pub trait PolyPatch: Send + Sync {
 ///
 /// Object-safe: can be used as `&dyn CoupledPatch`.
 pub trait CoupledPatch: PolyPatch {
+    /// Returns the face-to-cell mapping for this patch.
+    /// Maps each patch face to its owner cell index.
+    fn face_cells(&self) -> &[usize];
+
     /// Returns the neighbor cell centers.
     fn neighbor_cell_centers(&self) -> &[Vector];
 
@@ -254,7 +259,7 @@ pub trait CoupledPatch: PolyPatch {
 ```
 
 - 事前条件: なし
-- 事後条件: `neighbor_cell_centers().len() == size()`（パッチの面数と一致）
+- 事後条件: `face_cells().len() == size()`、`neighbor_cell_centers().len() == size()`（パッチの面数と一致）
 - 不変条件: `neighbor_rank()` は `ProcessorPolyPatch` で `Some`、`CyclicPolyPatch` で `None` を返す
 
 ---
@@ -298,7 +303,7 @@ impl WallPolyPatch {
 | フィールド | 詳細 |
 |----------|------|
 | 目的 | 周期境界パッチの具象実装 |
-| 要件 | 2.2, 2.7, 3.1, 3.2, 3.3 |
+| 要件 | 2.2, 2.7, 3.1, 3.2, 3.3, 3.4 |
 
 **責務 & 制約**
 - `PolyPatch` と `CoupledPatch` の両方を実装
@@ -321,6 +326,7 @@ pub struct CyclicPolyPatch {
     start: usize,
     size: usize,
     transform: Transform,
+    face_cells: Vec<usize>,
     neighbor_cell_centers: Vec<Vector>,
 }
 
@@ -330,6 +336,7 @@ impl CyclicPolyPatch {
         start: usize,
         size: usize,
         transform: Transform,
+        face_cells: Vec<usize>,
         neighbor_cell_centers: Vec<Vector>,
     ) -> Self;
 }
@@ -382,10 +389,8 @@ impl ProcessorPolyPatch {
         face_cells: Vec<usize>,
         neighbor_cell_centers: Vec<Vector>,
     ) -> Self;
-
-    /// Returns the face-to-cell mapping for this patch.
-    pub fn face_cells(&self) -> &[usize];
 }
+// face_cells() is provided via CoupledPatch trait implementation.
 ```
 
 **実装メモ**
@@ -442,6 +447,7 @@ pub enum PatchSpec {
         start: usize,
         size: usize,
         transform: Transform,
+        face_cells: Vec<usize>,
     },
     Processor {
         name: String,
@@ -866,6 +872,7 @@ classDiagram
 
     class CoupledPatch {
         <<trait>>
+        +face_cells() Vec~usize~
         +neighbor_cell_centers() Vec~Vector~
         +neighbor_rank() Option~i32~
         +transform() Option~Transform~
@@ -919,7 +926,7 @@ classDiagram
 
 ### エラー戦略
 
-既存の `MeshError` enum に 2 つのバリアントを追加する。Steering の `error-handling.md` に準拠し、`thiserror` による `Display` 自動実装と構造化エラー情報を提供する。
+既存の `MeshError` enum に 4 つのバリアントを追加する。Steering の `error-handling.md` に準拠し、`thiserror` による `Display` 自動実装と構造化エラー情報を提供する。
 
 ### エラーカテゴリ
 
