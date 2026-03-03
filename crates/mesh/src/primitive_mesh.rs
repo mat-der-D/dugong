@@ -46,6 +46,9 @@ pub struct PrimitiveMesh {
 impl PrimitiveMesh {
     /// Constructs a new `PrimitiveMesh` after validating all topology invariants.
     ///
+    /// The number of cells is derived as `max(owner) + 1` (or 0 if `owner`
+    /// is empty) and cached for O(1) access.
+    ///
     /// # Arguments
     ///
     /// * `points` — Vertex coordinates.
@@ -55,20 +58,18 @@ impl PrimitiveMesh {
     ///   `faces.len()`.
     /// * `neighbor` — The neighbor cell index for each internal face.
     ///   `neighbor.len()` implicitly defines the number of internal faces.
-    /// * `n_cells` — Total number of cells.
     ///
     /// # Errors
     ///
     /// Returns `Err` if any invariant is violated:
     /// - `owner.len() != faces.len()`
-    /// - Any `owner` or `neighbor` index `>= n_cells`
+    /// - Any `neighbor` index `>= n_cells`
     /// - Any point index in `faces` `>= points.len()`
     pub fn new(
         points: Vec<Vector>,
         faces: Vec<Vec<usize>>,
         owner: Vec<usize>,
         neighbor: Vec<usize>,
-        n_cells: usize,
     ) -> Result<Self, MeshError> {
         // owner length check
         if owner.len() != faces.len() {
@@ -78,16 +79,8 @@ impl PrimitiveMesh {
             });
         }
 
-        // owner index range check
-        for (face, &cell) in owner.iter().enumerate() {
-            if cell >= n_cells {
-                return Err(MeshError::OwnerIndexOutOfRange {
-                    face,
-                    cell,
-                    n_cells,
-                });
-            }
-        }
+        // n_cells is derived from owner
+        let n_cells = owner.iter().copied().max().map_or(0, |m| m + 1);
 
         // neighbor index range check
         for (face, &cell) in neighbor.iter().enumerate() {
@@ -359,7 +352,7 @@ mod tests {
         ];
         let owner = vec![0, 0, 0, 0, 0, 0];
         let neighbor = vec![];
-        PrimitiveMesh::new(points, faces, owner, neighbor, 1).unwrap()
+        PrimitiveMesh::new(points, faces, owner, neighbor).unwrap()
     }
 
     /// 2セルメッシュ（内部面1つ）
@@ -395,7 +388,7 @@ mod tests {
         ];
         let owner = vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
         let neighbor = vec![1]; // face 0 connects cell 0 and cell 1
-        PrimitiveMesh::new(points, faces, owner, neighbor, 2).unwrap()
+        PrimitiveMesh::new(points, faces, owner, neighbor).unwrap()
     }
 
     // ===== Task 7.1: Test helpers =====
@@ -422,20 +415,8 @@ mod tests {
         let points = vec![Vector::zero(); 4];
         let faces = vec![vec![0, 1, 2]];
         let owner = vec![0, 0]; // wrong length
-        let result = PrimitiveMesh::new(points, faces, owner, vec![], 1);
+        let result = PrimitiveMesh::new(points, faces, owner, vec![]);
         assert!(matches!(result, Err(MeshError::OwnerLengthMismatch { .. })));
-    }
-
-    #[test]
-    fn test_new_owner_index_out_of_range_returns_err() {
-        let points = vec![Vector::zero(); 4];
-        let faces = vec![vec![0, 1, 2]];
-        let owner = vec![5]; // out of range for n_cells=1
-        let result = PrimitiveMesh::new(points, faces, owner, vec![], 1);
-        assert!(matches!(
-            result,
-            Err(MeshError::OwnerIndexOutOfRange { .. })
-        ));
     }
 
     #[test]
@@ -443,8 +424,8 @@ mod tests {
         let points = vec![Vector::zero(); 4];
         let faces = vec![vec![0, 1, 2], vec![1, 2, 3]];
         let owner = vec![0, 1];
-        let neighbor = vec![5]; // out of range
-        let result = PrimitiveMesh::new(points, faces, owner, neighbor, 2);
+        let neighbor = vec![5]; // out of range: n_cells = max(owner)+1 = 2
+        let result = PrimitiveMesh::new(points, faces, owner, neighbor);
         assert!(matches!(
             result,
             Err(MeshError::NeighborIndexOutOfRange { .. })
@@ -456,7 +437,7 @@ mod tests {
         let points = vec![Vector::zero(); 3];
         let faces = vec![vec![0, 1, 99]]; // 99 out of range
         let owner = vec![0];
-        let result = PrimitiveMesh::new(points, faces, owner, vec![], 1);
+        let result = PrimitiveMesh::new(points, faces, owner, vec![]);
         assert!(matches!(
             result,
             Err(MeshError::PointIndexOutOfRange { .. })
