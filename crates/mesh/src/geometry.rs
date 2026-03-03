@@ -2,18 +2,20 @@ use std::collections::BTreeSet;
 
 use dugong_types::tensor::Vector;
 
-/// 面の重心と面積ベクトルを計算する。
+/// Computes the centroid and area vector of a single face.
 ///
-/// ファン三角形分割により、任意多角形の面に対応する。
-/// 戻り値: `(face_center, face_area_vector)`
+/// Uses fan triangulation from the average vertex position, which handles
+/// arbitrary polygons correctly.
+///
+/// Returns `(face_center, face_area_vector)`.
 ///
 /// # Panics
 ///
-/// `face` の各要素が `points` の有効なインデックスでない場合、実行時パニックとなる。
+/// Panics if any element of `face` is not a valid index into `points`.
 pub(crate) fn compute_face_geometry(points: &[Vector], face: &[usize]) -> (Vector, Vector) {
     let n = face.len();
 
-    // 参照点: 面頂点の単純平均
+    // Reference point: simple average of face vertices
     let mut p_ref = Vector::zero();
     for &idx in face {
         p_ref += points[idx];
@@ -27,7 +29,7 @@ pub(crate) fn compute_face_geometry(points: &[Vector], face: &[usize]) -> (Vecto
         let v_cur = points[face[i]];
         let v_next = points[face[(i + 1) % n]];
 
-        // 三角形面積ベクトル: 0.5 * (v_cur - p_ref) × (v_next - p_ref)
+        // Triangle area vector: 0.5 * (v_cur - p_ref) × (v_next - p_ref)
         let tri_area_vec = (v_cur - p_ref).cross(&(v_next - p_ref)) * 0.5;
         let tri_area = tri_area_vec.mag();
         let tri_center = (v_cur + v_next + p_ref) / 3.0;
@@ -46,16 +48,16 @@ pub(crate) fn compute_face_geometry(points: &[Vector], face: &[usize]) -> (Vecto
     (face_center, total_area_vec)
 }
 
-/// 全セルの体積と重心を一括計算する。
+/// Computes volumes and centroids for all cells in one pass.
 ///
-/// 戻り値: `(cell_volumes, cell_centers)`
+/// Returns `(cell_volumes, cell_centers)`.
 ///
 /// # Panics
 ///
-/// 以下の前提条件に違反した場合、実行時パニックとなる。
-/// - `faces` の各面に含まれる頂点インデックスが `points` の範囲内であること。
-/// - `owner` の各要素が `n_cells` 未満であること。
-/// - `neighbor` の各要素が `n_cells` 未満であること。
+/// Panics if any of the following preconditions are violated:
+/// - All point indices in each face are within `points` bounds.
+/// - All `owner` elements are less than `n_cells`.
+/// - All `neighbor` elements are less than `n_cells`.
 pub(crate) fn compute_cell_geometry(
     points: &[Vector],
     faces: &[Vec<usize>],
@@ -64,13 +66,14 @@ pub(crate) fn compute_cell_geometry(
     n_cells: usize,
 ) -> (Vec<f64>, Vec<Vector>) {
     let n_internal_faces = neighbor.len();
-    // まず全面のジオメトリを計算
+
+    // Compute geometry for all faces up front
     let face_geom: Vec<(Vector, Vector)> = faces
         .iter()
         .map(|f| compute_face_geometry(points, f))
         .collect();
 
-    // 各セルの参照点（そのセルに属する全面の面中心の平均）
+    // Reference point for each cell: average of its face centers
     let mut cell_face_count = vec![0usize; n_cells];
     let mut c_ref = vec![Vector::zero(); n_cells];
 
@@ -91,7 +94,7 @@ pub(crate) fn compute_cell_geometry(
     let mut cell_volumes = vec![0.0_f64; n_cells];
     let mut cell_centers_weighted = vec![Vector::zero(); n_cells];
 
-    // owner 面の寄与（正の向き）
+    // Owner-side contribution (area vector points away from owner)
     for (fi, &o) in owner.iter().enumerate() {
         let (fc, fa) = face_geom[fi];
         let pyr_vol = fa * (fc - c_ref[o]) / 3.0;
@@ -100,7 +103,7 @@ pub(crate) fn compute_cell_geometry(
         cell_centers_weighted[o] += pyr_center * pyr_vol;
     }
 
-    // neighbor 面の寄与（負の向き → 面積ベクトルを反転）
+    // Neighbor-side contribution (area vector is reversed for the neighbor cell)
     for fi in 0..n_internal_faces {
         let n = neighbor[fi];
         let (fc, fa) = face_geom[fi];
@@ -122,13 +125,13 @@ pub(crate) fn compute_cell_geometry(
     (cell_volumes, cell_centers)
 }
 
-/// 各セルの所属面インデックスリストを構築する。
+/// Builds the list of face indices adjacent to each cell.
 ///
 /// # Panics
 ///
-/// 以下の前提条件に違反した場合、実行時パニックとなる。
-/// - `owner` の各要素が `n_cells` 未満であること。
-/// - `neighbor` の各要素が `n_cells` 未満であること。
+/// Panics if any of the following preconditions are violated:
+/// - All `owner` elements are less than `n_cells`.
+/// - All `neighbor` elements are less than `n_cells`.
 pub(crate) fn compute_cell_faces(
     owner: &[usize],
     neighbor: &[usize],
@@ -144,12 +147,15 @@ pub(crate) fn compute_cell_faces(
     result
 }
 
-/// 各セルの隣接セルリストを導出する。
+/// Derives the list of neighboring cells for each cell.
+///
+/// Only internal faces (those with a neighbor entry) contribute. Boundary
+/// faces are ignored.
 ///
 /// # Panics
 ///
-/// 以下の前提条件に違反した場合、実行時パニックとなる。
-/// - `owner[0..neighbor.len()]` および `neighbor` の各要素が `n_cells` 未満であること。
+/// Panics if any element of `owner[0..neighbor.len()]` or `neighbor` is
+/// greater than or equal to `n_cells`.
 pub(crate) fn compute_cell_cells(
     cell_faces: &[Vec<usize>],
     owner: &[usize],
@@ -166,12 +172,14 @@ pub(crate) fn compute_cell_cells(
     result
 }
 
-/// 各セルの頂点インデックスを重複なく収集する。
+/// Collects the point indices belonging to each cell, with duplicates removed.
+///
+/// Points are gathered from all faces adjacent to each cell. The result for
+/// each cell is sorted in ascending order.
 ///
 /// # Panics
 ///
-/// 以下の前提条件に違反した場合、実行時パニックとなる。
-/// - `cell_faces` の各面インデックスが `faces` の範囲内であること。
+/// Panics if any face index in `cell_faces` is not a valid index into `faces`.
 pub(crate) fn compute_cell_points(
     cell_faces: &[Vec<usize>],
     faces: &[Vec<usize>],
@@ -195,7 +203,8 @@ mod tests {
     use super::*;
     use dugong_types::tensor::Vector;
 
-    /// 単位正方形面（z=0 平面、owner 側 (-z) から見て反時計回り → 法線 -z）
+    /// Unit square face in the z=0 plane, vertices listed counter-clockwise
+    /// when viewed from the owner side (-z), giving an outward normal of -z.
     fn square_points() -> Vec<Vector> {
         vec![
             Vector::new(0.0, 0.0, 0.0),
@@ -205,7 +214,7 @@ mod tests {
         ]
     }
 
-    /// 単位立方体の 8 点
+    /// 8 vertices of a unit cube.
     fn cube_points() -> Vec<Vector> {
         vec![
             Vector::new(0.0, 0.0, 0.0), // 0
@@ -219,7 +228,8 @@ mod tests {
         ]
     }
 
-    /// 単位立方体の 6 面（owner 側から見て反時計回り → 右手の法則で外向き法線）
+    /// 6 faces of a unit cube. Vertices are listed counter-clockwise when
+    /// viewed from the owner side, so the right-hand rule gives an outward normal.
     fn cube_faces() -> Vec<Vec<usize>> {
         vec![
             vec![0, 3, 2, 1], // f0: z- (normal -z)
@@ -245,8 +255,8 @@ mod tests {
     fn face_geometry_square_area_direction() {
         let pts = square_points();
         let (_, area_vec) = compute_face_geometry(&pts, &[0, 3, 2, 1]);
-        // 設計通り: 0.5 * (v_cur - p_ref) × (v_next - p_ref) で owner 外向き法線を生成
-        // 頂点は owner 側 (-z) から見て反時計回り → 右手の法則で -z 方向
+        // Vertices are counter-clockwise when viewed from the owner side (-z),
+        // so the right-hand rule gives a normal in the -z direction.
         assert!(
             area_vec.z() < 0.0,
             "expected -z normal from cross product convention"
@@ -272,10 +282,10 @@ mod tests {
             Vector::new(0.0, 2.0, 0.0),
         ];
         let (center, area_vec) = compute_face_geometry(&pts, &[0, 1, 2]);
-        // 三角形面積 = 2.0
+        // Triangle area = 2.0
         let area = area_vec.mag();
         assert!((area - 2.0).abs() < 1e-12, "expected area 2.0, got {area}");
-        // 重心 = (2/3, 2/3, 0)
+        // Centroid = (2/3, 2/3, 0)
         let expected = Vector::new(2.0 / 3.0, 2.0 / 3.0, 0.0);
         let diff = (center - expected).mag();
         assert!(diff < 1e-12, "triangle centroid error {diff}");
@@ -312,7 +322,7 @@ mod tests {
 
     #[test]
     fn cell_geometry_two_cells() {
-        // セル0: x=0..1, セル1: x=1..2
+        // cell 0: x=0..1, cell 1: x=1..2
         let pts = vec![
             Vector::new(0.0, 0.0, 0.0), // 0
             Vector::new(1.0, 0.0, 0.0), // 1
@@ -426,7 +436,7 @@ mod tests {
 
     #[test]
     fn cell_points_sorted() {
-        // BTreeSet を使用しているため、結果はソート済みであるべき
+        // BTreeSet guarantees sorted output
         let faces = cube_faces();
         let cf = vec![vec![0, 1, 2, 3, 4, 5]];
         let cp = compute_cell_points(&cf, &faces, 1);
